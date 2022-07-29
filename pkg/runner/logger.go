@@ -79,6 +79,9 @@ func WithJobLogger(ctx context.Context, jobID string, jobName string, config *Co
 	ctx = WithMasks(ctx, masks)
 
 	logger := logrus.New()
+	if hook := common.LoggerHook(ctx); hook != nil {
+		logger.AddHook(hook)
+	}
 	logger.SetFormatter(formatter)
 	logger.SetOutput(os.Stdout)
 	logger.SetLevel(logrus.GetLevel())
