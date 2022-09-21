@@ -164,6 +164,13 @@ func NewWorkflowPlanner(path string, noWorkflowRecurse bool) (WorkflowPlanner, e
 	return wp, nil
 }
 
+// CombineWorkflowPlanner combines workflows to a WorkflowPlanner
+func CombineWorkflowPlanner(workflows ...*Workflow) WorkflowPlanner {
+	return &workflowPlanner{
+		workflows: workflows,
+	}
+}
+
 type workflowPlanner struct {
 	workflows []*Workflow
 }

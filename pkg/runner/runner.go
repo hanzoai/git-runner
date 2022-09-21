@@ -55,6 +55,10 @@ type Config struct {
 	RemoteName                         string            // remote name in local git repo config
 	ReplaceGheActionWithGithubCom      []string          // Use actions from GitHub Enterprise instance to GitHub
 	ReplaceGheActionTokenWithGithubCom string            // Token of private action repo on GitHub.
+
+	PresetGitHubContext *model.GithubContext // the preset github context, overrides some fields like DefaultBranch, Env, Secrets etc.
+	EventJSON           string               // the content of JSON file to use for event.json in containers, overrides EventPath
+	ContainerNamePrefix string               // the prefix of container name
 }
 
 // Resolves the equivalent host path inside the container
@@ -109,7 +113,9 @@ func New(runnerConfig *Config) (Runner, error) {
 	}
 
 	runner.eventJSON = "{}"
-	if runnerConfig.EventPath != "" {
+	if runnerConfig.EventJSON != "" {
+		runner.eventJSON = runnerConfig.EventJSON
+	} else if runnerConfig.EventPath != "" {
 		log.Debugf("Reading event.json from %s", runner.config.EventPath)
 		eventJSONBytes, err := os.ReadFile(runner.config.EventPath)
 		if err != nil {

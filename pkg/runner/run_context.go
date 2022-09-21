@@ -66,7 +66,7 @@ func (rc *RunContext) GetEnv() map[string]string {
 }
 
 func (rc *RunContext) jobContainerName() string {
-	return createContainerName("act", rc.String())
+	return createContainerName(rc.Config.ContainerNamePrefix, rc.String())
 }
 
 // Returns the binds and mounts for the container, resolving paths as appopriate
@@ -445,6 +445,25 @@ func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext
 	// a default rather than being run as a cmd
 	if ghc.Actor == "" {
 		ghc.Actor = "nektos/act"
+	}
+
+	if preset := rc.Config.PresetGitHubContext; preset != nil {
+		ghc.Event = preset.Event
+		ghc.RunID = preset.RunID
+		ghc.RunNumber = preset.RunNumber
+		ghc.Actor = preset.Actor
+		ghc.Repository = preset.Repository
+		ghc.EventName = preset.EventName
+		ghc.Sha = preset.Sha
+		ghc.Ref = preset.Ref
+		ghc.RefName = preset.RefName
+		ghc.RefType = preset.RefType
+		ghc.HeadRef = preset.HeadRef
+		ghc.BaseRef = preset.BaseRef
+		ghc.Token = preset.Token
+		ghc.RepositoryOwner = preset.RepositoryOwner
+		ghc.RetentionDays = preset.RetentionDays
+		return ghc
 	}
 
 	repoPath := rc.Config.Workdir
