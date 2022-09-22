@@ -396,6 +396,7 @@ type ContainerSpec struct {
 
 // Step is the structure of one step in a job
 type Step struct {
+	Number             int               `yaml:"-"`
 	ID                 string            `yaml:"id"`
 	If                 yaml.Node         `yaml:"if"`
 	Name               string            `yaml:"name"`

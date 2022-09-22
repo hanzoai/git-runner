@@ -48,6 +48,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 		if stepModel.ID == "" {
 			stepModel.ID = fmt.Sprintf("%d", i)
 		}
+		stepModel.Number = i
 
 		step, err := sf.newStep(stepModel, rc)
 
@@ -119,7 +120,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 
 func useStepLogger(rc *RunContext, stepModel *model.Step, stage stepStage, executor common.Executor) common.Executor {
 	return func(ctx context.Context) error {
-		ctx = withStepLogger(ctx, stepModel.ID, stepModel.String(), stage.String())
+		ctx = withStepLogger(ctx, stepModel.Number, stepModel.ID, stepModel.String(), stage.String())
 
 		rawLogger := common.Logger(ctx).WithField("raw_output", true)
 		logWriter := common.NewLineWriter(rc.commandHandler(ctx), func(s string) bool {

@@ -120,6 +120,7 @@ func (rc *RunContext) compositeExecutor(action *model.Action) *compositeSteps {
 		if step.ID == "" {
 			step.ID = fmt.Sprintf("%d", i)
 		}
+		step.Number = i
 
 		// create a copy of the step, since this composite action could
 		// run multiple times and we might modify the instance
