@@ -94,11 +94,6 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 				WithField("arch", cfg.Platform.Arch).
 				Infoln("polling the remote server")
 
-			// register new runner
-			if err := poller.Register(ctx, cfg.Runner); err != nil {
-				return err
-			}
-
 			// update runner status to idle
 			log.Infoln("update runner status to idle")
 			if _, err := cli.UpdateRunner(
