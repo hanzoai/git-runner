@@ -30,9 +30,7 @@ type stepActionRemote struct {
 	remoteAction        *remoteAction
 }
 
-var (
-	stepActionRemoteNewCloneExecutor = git.NewGitCloneExecutor
-)
+var stepActionRemoteNewCloneExecutor = git.NewGitCloneExecutor
 
 func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 	return func(ctx context.Context) error {
@@ -46,7 +44,7 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			return fmt.Errorf("Expected format {org}/{repo}[/path]@ref. Actual '%s' Input string was not in a correct format", sar.Step.Uses)
 		}
 
-		sar.remoteAction.URL = sar.RunContext.Config.GitHubInstance
+		sar.remoteAction.URL = sar.RunContext.Config.DefaultActionInstance
 
 		github := sar.getGithubContext(ctx)
 		if sar.remoteAction.IsCheckout() && isLocalCheckout(github, sar.Step) && !sar.RunContext.Config.NoSkipCheckout {
@@ -54,7 +52,6 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			return nil
 		}
 
-		sar.remoteAction.URL = sar.RunContext.Config.GitHubInstance
 		for _, action := range sar.RunContext.Config.ReplaceGheActionWithGithubCom {
 			if strings.EqualFold(fmt.Sprintf("%s/%s", sar.remoteAction.Org, sar.remoteAction.Repo), action) {
 				sar.remoteAction.URL = "github.com"
@@ -213,7 +210,11 @@ type remoteAction struct {
 }
 
 func (ra *remoteAction) CloneURL() string {
-	return fmt.Sprintf("https://%s/%s/%s", ra.URL, ra.Org, ra.Repo)
+	u := ra.URL
+	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		u = "https://" + u
+	}
+	return fmt.Sprintf("%s/%s/%s", u, ra.Org, ra.Repo)
 }
 
 func (ra *remoteAction) IsCheckout() bool {

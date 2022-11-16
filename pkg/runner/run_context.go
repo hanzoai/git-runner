@@ -177,15 +177,15 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			rc.JobContainer.UpdateFromEnv("/etc/environment", &rc.Env),
 			rc.JobContainer.Copy(ActPath+"/", &container.FileEntry{
 				Name: "workflow/event.json",
-				Mode: 0644,
+				Mode: 0o644,
 				Body: rc.EventJSON,
 			}, &container.FileEntry{
 				Name: "workflow/envs.txt",
-				Mode: 0666,
+				Mode: 0o666,
 				Body: "",
 			}, &container.FileEntry{
 				Name: "workflow/paths.txt",
-				Mode: 0666,
+				Mode: 0o666,
 				Body: "",
 			}),
 		)(ctx)
@@ -588,9 +588,16 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 	env["RUNNER_PERFLOG"] = github.RunnerPerflog
 	env["RUNNER_TRACKING_ID"] = github.RunnerTrackingID
 	if rc.Config.GitHubInstance != "github.com" {
-		env["GITHUB_SERVER_URL"] = fmt.Sprintf("https://%s", rc.Config.GitHubInstance)
-		env["GITHUB_API_URL"] = fmt.Sprintf("https://%s/api/v3", rc.Config.GitHubInstance)
-		env["GITHUB_GRAPHQL_URL"] = fmt.Sprintf("https://%s/api/graphql", rc.Config.GitHubInstance)
+		hasProtocol := strings.HasPrefix(rc.Config.GitHubInstance, "http://") || strings.HasPrefix(rc.Config.GitHubInstance, "https://")
+		if hasProtocol {
+			env["GITHUB_SERVER_URL"] = rc.Config.GitHubInstance
+			env["GITHUB_API_URL"] = fmt.Sprintf("%s/api/v3", rc.Config.GitHubInstance) // FIXME: gitea is v1 not v3
+			env["GITHUB_GRAPHQL_URL"] = fmt.Sprintf("%s/api/graphql", rc.Config.GitHubInstance)
+		} else {
+			env["GITHUB_SERVER_URL"] = fmt.Sprintf("https://%s", rc.Config.GitHubInstance)
+			env["GITHUB_API_URL"] = fmt.Sprintf("https://%s/api/v3", rc.Config.GitHubInstance)
+			env["GITHUB_GRAPHQL_URL"] = fmt.Sprintf("https://%s/api/graphql", rc.Config.GitHubInstance)
+		}
 	}
 
 	if rc.Config.ArtifactServerPath != "" {
