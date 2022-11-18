@@ -57,6 +57,8 @@ type NewContainerInput struct {
 	UsernsMode  string
 	Platform    string
 	Options     string
+
+	AutoRemove bool
 }
 
 // FileEntry is a file to copy to a container
@@ -475,6 +477,7 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 			NetworkMode: container.NetworkMode(input.NetworkMode),
 			Privileged:  input.Privileged,
 			UsernsMode:  container.UsernsMode(input.UsernsMode),
+			AutoRemove:  input.AutoRemove,
 		}
 		logger.Debugf("Common container.HostConfig ==> %+v", hostConfig)
 

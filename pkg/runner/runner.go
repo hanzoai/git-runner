@@ -59,6 +59,8 @@ type Config struct {
 	PresetGitHubContext   *model.GithubContext // the preset github context, overrides some fields like DefaultBranch, Env, Secrets etc.
 	EventJSON             string               // the content of JSON file to use for event.json in containers, overrides EventPath
 	ContainerNamePrefix   string               // the prefix of container name
+	ContainerMaxLifetime  time.Duration        // the max lifetime of job containers
+	ContainerNetworkMode  string               // the network mode of job containers
 	DefaultActionInstance string               // the default actions web site
 }
 

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -150,7 +151,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
 			Cmd:         nil,
-			Entrypoint:  []string{"/usr/bin/tail", "-f", "/dev/null"},
+			Entrypoint:  []string{"/bin/sleep", fmt.Sprint(rc.Config.ContainerMaxLifetime.Round(time.Second).Seconds())},
 			WorkingDir:  rc.Config.ContainerWorkdir(),
 			Image:       image,
 			Username:    username,
@@ -158,7 +159,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			Name:        name,
 			Env:         envList,
 			Mounts:      mounts,
-			NetworkMode: "host",
+			NetworkMode: rc.Config.ContainerNetworkMode,
 			Binds:       binds,
 			Stdout:      logWriter,
 			Stderr:      logWriter,
@@ -166,6 +167,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			UsernsMode:  rc.Config.UsernsMode,
 			Platform:    rc.Config.ContainerArchitecture,
 			Options:     rc.options(ctx),
+			AutoRemove:  rc.Config.AutoRemove,
 		})
 
 		return common.NewPipelineExecutor(
