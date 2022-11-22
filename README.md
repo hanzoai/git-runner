@@ -1,7 +1,14 @@
+## Naming rules:
+
 Branches:
 
-- main: default branch, contains custom changes.
-- upstream: tracks stable releases of [nektos/act](https://github.com/nektos/act/).
+- `main`: default branch, contains custom changes.
+- `nektos/master`: mirror for `master` of [nektos/act](https://github.com/nektos/act/).
+
+Tags:
+
+- `vX.YZ.*`: based on `nektos/vX.Y.Z`, contains custom changes.
+- `nektos/vX.Y.Z`: mirror for `vX.Y.Z` of [nektos/act](https://github.com/nektos/act/).
 
 ---
 
