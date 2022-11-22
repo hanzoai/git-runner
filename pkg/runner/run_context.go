@@ -593,12 +593,12 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 		hasProtocol := strings.HasPrefix(rc.Config.GitHubInstance, "http://") || strings.HasPrefix(rc.Config.GitHubInstance, "https://")
 		if hasProtocol {
 			env["GITHUB_SERVER_URL"] = rc.Config.GitHubInstance
-			env["GITHUB_API_URL"] = fmt.Sprintf("%s/api/v1", rc.Config.GitHubInstance) // FIXME: gitea is v1 not v3
-			env["GITHUB_GRAPHQL_URL"] = fmt.Sprintf("%s/api/graphql", rc.Config.GitHubInstance)
+			env["GITHUB_API_URL"] = fmt.Sprintf("%s/api/v1", rc.Config.GitHubInstance)
+			env["GITHUB_GRAPHQL_URL"] = "" // disable graphql url because Gitea doesn't support that
 		} else {
 			env["GITHUB_SERVER_URL"] = fmt.Sprintf("https://%s", rc.Config.GitHubInstance)
 			env["GITHUB_API_URL"] = fmt.Sprintf("https://%s/api/v1", rc.Config.GitHubInstance)
-			env["GITHUB_GRAPHQL_URL"] = fmt.Sprintf("https://%s/api/graphql", rc.Config.GitHubInstance)
+			env["GITHUB_GRAPHQL_URL"] = "" // disable graphql url because Gitea doesn't support that
 		}
 	}
 
