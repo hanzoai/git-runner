@@ -299,9 +299,19 @@ func (rc *RunContext) platformImage(ctx context.Context) string {
 		common.Logger(ctx).Errorf("'runs-on' key not defined in %s", rc.String())
 	}
 
-	for _, runnerLabel := range job.RunsOn() {
-		platformName := rc.ExprEval.Interpolate(ctx, runnerLabel)
-		image := rc.Config.Platforms[strings.ToLower(platformName)]
+	runsOn := job.RunsOn()
+	for i, v := range runsOn {
+		runsOn[i] = rc.ExprEval.Interpolate(ctx, v)
+	}
+
+	if pick := rc.Config.PlatformPicker; pick != nil {
+		if image := pick(runsOn); image != "" {
+			return image
+		}
+	}
+
+	for _, runnerLabel := range runsOn {
+		image := rc.Config.Platforms[strings.ToLower(runnerLabel)]
 		if image != "" {
 			return image
 		}
