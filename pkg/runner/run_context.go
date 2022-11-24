@@ -67,7 +67,7 @@ func (rc *RunContext) GetEnv() map[string]string {
 }
 
 func (rc *RunContext) jobContainerName() string {
-	return createContainerName(rc.Config.ContainerNamePrefix, rc.String())
+	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+rc.Run.Workflow.Name, "JOB-"+rc.Name)
 }
 
 // Returns the binds and mounts for the container, resolving paths as appopriate
@@ -367,6 +367,7 @@ func mergeMaps(maps ...map[string]string) map[string]string {
 	return rtnMap
 }
 
+// deprecated: use createSimpleContainerName
 func createContainerName(parts ...string) string {
 	name := make([]string, 0)
 	pattern := regexp.MustCompile("[^a-zA-Z0-9]")
@@ -388,6 +389,22 @@ func createContainerName(parts ...string) string {
 		}
 	}
 	return strings.ReplaceAll(strings.Trim(strings.Join(name, "-"), "-"), "--", "-")
+}
+
+func createSimpleContainerName(parts ...string) string {
+	pattern := regexp.MustCompile("[^a-zA-Z0-9-]")
+	name := make([]string, 0, len(parts))
+	for _, v := range parts {
+		v = pattern.ReplaceAllString(v, "-")
+		v = strings.Trim(v, "-")
+		for strings.Contains(v, "--") {
+			v = strings.ReplaceAll(v, "--", "-")
+		}
+		if v != "" {
+			name = append(name, v)
+		}
+	}
+	return strings.Join(name, "_")
 }
 
 func trimToLen(s string, l int) string {

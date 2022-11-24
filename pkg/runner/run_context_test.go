@@ -623,3 +623,24 @@ func TestRunContextGetEnv(t *testing.T) {
 		})
 	}
 }
+
+func Test_createSimpleContainerName(t *testing.T) {
+	tests := []struct {
+		parts []string
+		want  string
+	}{
+		{
+			parts: []string{"a--a", "BB正", "c-C"},
+			want:  "a-a_BB_c-C",
+		},
+		{
+			parts: []string{"a-a", "", "-"},
+			want:  "a-a",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.parts, " "), func(t *testing.T) {
+			assert.Equalf(t, tt.want, createSimpleContainerName(tt.parts...), "createSimpleContainerName(%v)", tt.parts)
+		})
+	}
+}
