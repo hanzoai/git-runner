@@ -55,7 +55,7 @@ If you are using Linux, you will need to [install Docker Engine](https://docs.do
 brew install act
 ```
 
-or if you want to install version based on latest commit, you can run below (it requires compiler to be installed installed but Homebrew will suggest you how to install it, if you don't have it):
+or if you want to install version based on latest commit, you can run below (it requires compiler to be installed but Homebrew will suggest you how to install it, if you don't have it):
 
 ```shell
 brew install act --HEAD
@@ -161,6 +161,9 @@ act pull_request
 
 # Run a specific job:
 act -j test
+
+# Run a job in a specific workflow (useful if you have duplicate job names)
+act -j lint -W .github/workflows/checks.yml
 
 # Run in dry-run mode:
 act -n
