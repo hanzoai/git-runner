@@ -67,6 +67,30 @@ func (w *Workflow) OnEvent(event string) interface{} {
 	return nil
 }
 
+func (w *Workflow) OnSchedule() []string {
+	schedules := w.OnEvent("schedule")
+	if schedules == nil {
+		return []string{}
+	}
+
+	switch val := schedules.(type) {
+	case []interface{}:
+		allSchedules := []string{}
+		for _, v := range val {
+			for k, cron := range v.(map[string]interface{}) {
+				if k != "cron" {
+					continue
+				}
+				allSchedules = append(allSchedules, cron.(string))
+			}
+		}
+		return allSchedules
+	default:
+	}
+
+	return []string{}
+}
+
 type WorkflowDispatchInput struct {
 	Description string   `yaml:"description"`
 	Required    bool     `yaml:"required"`
@@ -487,7 +511,7 @@ func (s *Step) GetEnv() map[string]string {
 func (s *Step) ShellCommand() string {
 	shellCommand := ""
 
-	//Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L9-L17
+	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L9-L17
 	switch s.Shell {
 	case "", "bash":
 		shellCommand = "bash --noprofile --norc -e -o pipefail {0}"
