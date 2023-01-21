@@ -10,6 +10,7 @@ name: test
 jobs:
   job2:
     name: job2
+    needs: job1
     runs-on: linux
     steps:
       - run: uname -a
@@ -18,6 +19,7 @@ name: test
 jobs:
   job3:
     name: job3
+    needs: [job1, job2]
     runs-on: linux
     steps:
       - run: uname -a
