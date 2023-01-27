@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"os"
+	"strings"
 
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
@@ -30,10 +31,22 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 
 		initLogging(cfg)
 
-		// try to connect to docker daemon
-		// if failed, exit with error
-		if err := engine.Start(ctx); err != nil {
-			log.WithError(err).Fatalln("failed to connect docker daemon engine")
+		// require docker if a runner label uses a docker backend
+		needsDocker := false
+		for _, l := range cfg.Runner.Labels {
+			splits := strings.SplitN(l, ":", 2)
+			if len(splits) == 2 && strings.HasPrefix(splits[1], "docker://") {
+				needsDocker = true
+				break
+			}
+		}
+
+		if needsDocker {
+			// try to connect to docker daemon
+			// if failed, exit with error
+			if err := engine.Start(ctx); err != nil {
+				log.WithError(err).Fatalln("failed to connect docker daemon engine")
+			}
 		}
 
 		var g errgroup.Group

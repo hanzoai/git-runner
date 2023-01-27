@@ -119,9 +119,10 @@ func (r *registerInputs) validate() error {
 func validateLabels(labels []string) error {
 	for _, label := range labels {
 		values := strings.SplitN(label, ":", 2)
-		if len(values) != 2 {
+		if len(values) > 2 {
 			return fmt.Errorf("Invalid label: %s", label)
 		}
+		// len(values) == 1, label for non docker execution environment
 		// TODO: validate value format, like docker://node:16-buster
 	}
 	return nil
@@ -227,7 +228,7 @@ func printStageHelp(stage registerStage) {
 		hostname, _ := os.Hostname()
 		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
 	case StageInputCustomLabels:
-		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
+		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, self-hosted,ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}

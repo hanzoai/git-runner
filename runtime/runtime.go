@@ -24,11 +24,17 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 
 func (s *Runner) platformPicker(labels []string) string {
 	// "ubuntu-18.04:docker://node:16-buster"
+	// "self-hosted"
 
 	platforms := make(map[string]string, len(labels))
 	for _, l := range s.Labels {
 		// "ubuntu-18.04:docker://node:16-buster"
 		splits := strings.SplitN(l, ":", 2)
+		if len(splits) == 1 {
+			// identifier for non docker execution environment
+			platforms[splits[0]] = "-self-hosted"
+			continue
+		}
 		// ["ubuntu-18.04", "docker://node:16-buster"]
 		k, v := splits[0], splits[1]
 
