@@ -112,7 +112,7 @@ func getToken(task *runnerv1.Task) string {
 	return token
 }
 
-func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task) (lastErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
@@ -128,6 +128,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	lastWords := ""
 	reporter := NewReporter(ctx, cancel, t.client, task)
 	defer func() {
+		// set the job to failed on an error return value
+		if lastErr != nil {
+			reporter.Fire(&log.Entry{
+				Data: log.Fields{
+					"jobResult": "failure",
+				},
+			})
+		}
 		_ = reporter.Close(lastWords)
 	}()
 	reporter.RunDaemon()
