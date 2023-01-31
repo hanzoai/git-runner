@@ -16,7 +16,6 @@ func NewInterpeter(
 	gitCtx *model.GithubContext,
 	results map[string]*JobResult,
 ) exprparser.Interpreter {
-
 	strategy := make(map[string]interface{})
 	if job.Strategy != nil {
 		strategy["fail-fast"] = job.Strategy.FailFast

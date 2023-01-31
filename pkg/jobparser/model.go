@@ -1,6 +1,8 @@
 package jobparser
 
 import (
+	"fmt"
+
 	"github.com/nektos/act/pkg/model"
 	"gopkg.in/yaml.v3"
 )
@@ -120,4 +122,86 @@ type Defaults struct {
 type RunDefaults struct {
 	Shell            string `yaml:"shell,omitempty"`
 	WorkingDirectory string `yaml:"working-directory,omitempty"`
+}
+
+type Event struct {
+	Name string
+	Acts map[string][]string
+}
+
+func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
+	switch rawOn.Kind {
+	case yaml.ScalarNode:
+		var val string
+		err := rawOn.Decode(&val)
+		if err != nil {
+			return nil, err
+		}
+		return []*Event{
+			{Name: val},
+		}, nil
+	case yaml.SequenceNode:
+		var val []interface{}
+		err := rawOn.Decode(&val)
+		if err != nil {
+			return nil, err
+		}
+		res := make([]*Event, 0, len(val))
+		for _, v := range val {
+			switch t := v.(type) {
+			case string:
+				res = append(res, &Event{Name: t})
+			default:
+				return nil, fmt.Errorf("invalid type %T", t)
+			}
+		}
+		return res, nil
+	case yaml.MappingNode:
+		var val map[string]interface{}
+		err := rawOn.Decode(&val)
+		if err != nil {
+			return nil, err
+		}
+		res := make([]*Event, 0, len(val))
+		for k, v := range val {
+			switch t := v.(type) {
+			case string:
+				res = append(res, &Event{
+					Name: k,
+					Acts: map[string][]string{},
+				})
+			case []string:
+				res = append(res, &Event{
+					Name: k,
+					Acts: map[string][]string{},
+				})
+			case map[string]interface{}:
+				acts := make(map[string][]string, len(t))
+				for act, branches := range t {
+					switch b := branches.(type) {
+					case string:
+						acts[act] = []string{b}
+					case []string:
+						acts[act] = b
+					case []interface{}:
+						acts[act] = make([]string, len(b))
+						for i, v := range b {
+							acts[act][i] = v.(string)
+						}
+					default:
+						return nil, fmt.Errorf("unknown on type: %#v", branches)
+					}
+				}
+				res = append(res, &Event{
+					Name: k,
+					Acts: acts,
+				})
+			default:
+				return nil, fmt.Errorf("unknown on type: %#v", v)
+			}
+		}
+		return res, nil
+	default:
+		return nil, fmt.Errorf("unknown on type: %v", rawOn.Kind)
+	}
 }
