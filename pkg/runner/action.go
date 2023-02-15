@@ -29,8 +29,10 @@ type actionStep interface {
 
 type readAction func(ctx context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error)
 
-type actionYamlReader func(filename string) (io.Reader, io.Closer, error)
-type fileWriter func(filename string, data []byte, perm fs.FileMode) error
+type (
+	actionYamlReader func(filename string) (io.Reader, io.Closer, error)
+	fileWriter       func(filename string, data []byte, perm fs.FileMode) error
+)
 
 type runAction func(step actionStep, actionDir string, remoteAction *remoteAction) common.Executor
 
@@ -61,7 +63,7 @@ func readActionImpl(ctx context.Context, step *model.Step, actionDir string, act
 					if b, err = trampoline.ReadFile("res/trampoline.js"); err != nil {
 						return nil, err
 					}
-					err2 := writeFile(filepath.Join(actionDir, actionPath, "trampoline.js"), b, 0400)
+					err2 := writeFile(filepath.Join(actionDir, actionPath, "trampoline.js"), b, 0o400)
 					if err2 != nil {
 						return nil, err2
 					}
@@ -167,6 +169,13 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 			}
 
 			return execAsComposite(step)(ctx)
+		case model.ActionRunsUsingGo:
+			if err := maybeCopyToActionDir(ctx, step, actionDir, actionPath, containerActionDir); err != nil {
+				return err
+			}
+			containerArgs := []string{"go", "run", path.Join(containerActionDir, action.Runs.Main)}
+			logger.Debugf("executing remote job container: %s", containerArgs)
+			return rc.execJobContainer(containerArgs, *step.getEnv(), "", "")(ctx)
 		default:
 			return fmt.Errorf(fmt.Sprintf("The runs.using key must be one of: %v, got %s", []string{
 				model.ActionRunsUsingDocker,

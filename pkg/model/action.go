@@ -42,6 +42,8 @@ const (
 	ActionRunsUsingDocker = "docker"
 	// ActionRunsUsingComposite for running composite
 	ActionRunsUsingComposite = "composite"
+	// ActionRunsUsingGo for running with go
+	ActionRunsUsingGo = "go"
 )
 
 // ActionRuns are a field in Action
