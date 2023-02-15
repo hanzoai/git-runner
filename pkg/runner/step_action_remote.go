@@ -44,8 +44,6 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			return fmt.Errorf("Expected format {org}/{repo}[/path]@ref. Actual '%s' Input string was not in a correct format", sar.Step.Uses)
 		}
 
-		sar.remoteAction.URL = sar.RunContext.Config.DefaultActionInstance
-
 		github := sar.getGithubContext(ctx)
 		if sar.remoteAction.IsCheckout() && isLocalCheckout(github, sar.Step) && !sar.RunContext.Config.NoSkipCheckout {
 			common.Logger(ctx).Debugf("Skipping local actions/checkout because workdir was already copied")
@@ -61,7 +59,7 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 
 		actionDir := fmt.Sprintf("%s/%s", sar.RunContext.ActionCacheDir(), strings.ReplaceAll(sar.Step.Uses, "/", "-"))
 		gitClone := stepActionRemoteNewCloneExecutor(git.NewGitCloneExecutorInput{
-			URL:   sar.remoteAction.CloneURL(),
+			URL:   sar.remoteAction.CloneURL(sar.RunContext.Config.DefaultActionInstance),
 			Ref:   sar.remoteAction.Ref,
 			Dir:   actionDir,
 			Token: "", /*
@@ -215,8 +213,11 @@ type remoteAction struct {
 	Ref  string
 }
 
-func (ra *remoteAction) CloneURL() string {
+func (ra *remoteAction) CloneURL(defaultURL string) string {
 	u := ra.URL
+	if u == "" {
+		u = defaultURL
+	}
 	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		u = "https://" + u
 	}
@@ -231,6 +232,26 @@ func (ra *remoteAction) IsCheckout() bool {
 }
 
 func newRemoteAction(action string) *remoteAction {
+	// support http(s)://host/owner/repo@v3
+	for _, schema := range []string{"https://", "http://"} {
+		if strings.HasPrefix(action, schema) {
+			splits := strings.SplitN(strings.TrimPrefix(action, schema), "/", 2)
+			if len(splits) != 2 {
+				return nil
+			}
+			ret := parseAction(splits[1])
+			if ret == nil {
+				return nil
+			}
+			ret.URL = schema + splits[0]
+			return ret
+		}
+	}
+
+	return parseAction(action)
+}
+
+func parseAction(action string) *remoteAction {
 	// GitHub's document[^] describes:
 	// > We strongly recommend that you include the version of
 	// > the action you are using by specifying a Git ref, SHA, or Docker tag number.
@@ -246,6 +267,6 @@ func newRemoteAction(action string) *remoteAction {
 		Repo: matches[2],
 		Path: matches[4],
 		Ref:  matches[6],
-		URL:  "github.com",
+		URL:  "",
 	}
 }

@@ -623,3 +623,97 @@ func TestStepActionRemotePost(t *testing.T) {
 		})
 	}
 }
+
+func Test_newRemoteAction(t *testing.T) {
+	tests := []struct {
+		action       string
+		want         *remoteAction
+		wantCloneURL string
+	}{
+		{
+			action: "actions/heroku@main",
+			want: &remoteAction{
+				URL:  "",
+				Org:  "actions",
+				Repo: "heroku",
+				Path: "",
+				Ref:  "main",
+			},
+			wantCloneURL: "https://github.com/actions/heroku",
+		},
+		{
+			action: "actions/aws/ec2@main",
+			want: &remoteAction{
+				URL:  "",
+				Org:  "actions",
+				Repo: "aws",
+				Path: "ec2",
+				Ref:  "main",
+			},
+			wantCloneURL: "https://github.com/actions/aws",
+		},
+		{
+			action: "./.github/actions/my-action", // it's valid for GitHub, but act don't support it
+			want:   nil,
+		},
+		{
+			action: "docker://alpine:3.8", // it's valid for GitHub, but act don't support it
+			want:   nil,
+		},
+		{
+			action: "https://gitea.com/actions/heroku@main", // it's invalid for GitHub, but gitea supports it
+			want: &remoteAction{
+				URL:  "https://gitea.com",
+				Org:  "actions",
+				Repo: "heroku",
+				Path: "",
+				Ref:  "main",
+			},
+			wantCloneURL: "https://gitea.com/actions/heroku",
+		},
+		{
+			action: "https://gitea.com/actions/aws/ec2@main", // it's invalid for GitHub, but gitea supports it
+			want: &remoteAction{
+				URL:  "https://gitea.com",
+				Org:  "actions",
+				Repo: "aws",
+				Path: "ec2",
+				Ref:  "main",
+			},
+			wantCloneURL: "https://gitea.com/actions/aws",
+		},
+		{
+			action: "http://gitea.com/actions/heroku@main", // it's invalid for GitHub, but gitea supports it
+			want: &remoteAction{
+				URL:  "http://gitea.com",
+				Org:  "actions",
+				Repo: "heroku",
+				Path: "",
+				Ref:  "main",
+			},
+			wantCloneURL: "http://gitea.com/actions/heroku",
+		},
+		{
+			action: "http://gitea.com/actions/aws/ec2@main", // it's invalid for GitHub, but gitea supports it
+			want: &remoteAction{
+				URL:  "http://gitea.com",
+				Org:  "actions",
+				Repo: "aws",
+				Path: "ec2",
+				Ref:  "main",
+			},
+			wantCloneURL: "http://gitea.com/actions/aws",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.action, func(t *testing.T) {
+			got := newRemoteAction(tt.action)
+			assert.Equalf(t, tt.want, got, "newRemoteAction(%v)", tt.action)
+			cloneURL := ""
+			if got != nil {
+				cloneURL = got.CloneURL("github.com")
+			}
+			assert.Equalf(t, tt.wantCloneURL, cloneURL, "newRemoteAction(%v).CloneURL()", tt.action)
+		})
+	}
+}
