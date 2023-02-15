@@ -69,6 +69,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 type registerArgs struct {
 	NoInteractive bool
 	InstanceAddr  string
+	Insecure      bool
 	Token         string
 	RunnerName    string
 	Labels        string
@@ -87,17 +88,16 @@ const (
 	StageExit
 )
 
-var (
-	defaultLabels = []string{
-		"ubuntu-latest:docker://node:16-bullseye",
-		"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
-		"ubuntu-20.04:docker://node:16-bullseye",
-		"ubuntu-18.04:docker://node:16-buster",
-	}
-)
+var defaultLabels = []string{
+	"ubuntu-latest:docker://node:16-bullseye",
+	"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
+	"ubuntu-20.04:docker://node:16-bullseye",
+	"ubuntu-18.04:docker://node:16-buster",
+}
 
 type registerInputs struct {
 	InstanceAddr string
+	Insecure     bool
 	Token        string
 	RunnerName   string
 	CustomLabels []string
@@ -239,6 +239,7 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	cfg, _ := config.FromEnviron()
 	inputs := &registerInputs{
 		InstanceAddr: regArgs.InstanceAddr,
+		Insecure:     regArgs.Insecure,
 		Token:        regArgs.Token,
 		RunnerName:   regArgs.RunnerName,
 		CustomLabels: defaultLabels,
@@ -269,6 +270,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	// initial http client
 	cli := client.New(
 		inputs.InstanceAddr,
+		inputs.Insecure,
 		"", "",
 	)
 

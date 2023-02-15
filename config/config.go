@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 
 	"gitea.com/gitea/act_runner/core"
 
@@ -23,7 +24,8 @@ type (
 	}
 
 	Client struct {
-		Address string `ignored:"true"`
+		Address  string `ignored:"true"`
+		Insecure bool
 	}
 
 	Runner struct {
@@ -51,7 +53,8 @@ func FromEnviron() (Config, error) {
 	}
 
 	// check runner config exist
-	if f, err := os.Stat(cfg.Runner.File); err == nil && !f.IsDir() {
+	f, err := os.Stat(cfg.Runner.File)
+	if err == nil && !f.IsDir() {
 		jsonFile, _ := os.Open(cfg.Runner.File)
 		defer jsonFile.Close()
 		byteValue, _ := io.ReadAll(jsonFile)
@@ -71,6 +74,11 @@ func FromEnviron() (Config, error) {
 		if runner.Address != "" {
 			cfg.Client.Address = runner.Address
 		}
+		if runner.Insecure != "" {
+			cfg.Client.Insecure, _ = strconv.ParseBool(runner.Insecure)
+		}
+	} else if err != nil {
+		return cfg, err
 	}
 
 	// runner config

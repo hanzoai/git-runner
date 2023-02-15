@@ -53,6 +53,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 
 		cli := client.New(
 			cfg.Client.Address,
+			cfg.Client.Insecure,
 			cfg.Runner.UUID,
 			cfg.Runner.Token,
 		)
