@@ -717,3 +717,24 @@ func Test_newRemoteAction(t *testing.T) {
 		})
 	}
 }
+
+func Test_safeFilename(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{
+			s:    "https://test.com/test/",
+			want: "https---test.com-test-",
+		},
+		{
+			s:    `<>:"/\|?*`,
+			want: "---------",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.s, func(t *testing.T) {
+			assert.Equalf(t, tt.want, safeFilename(tt.s), "safeFilename(%v)", tt.s)
+		})
+	}
+}

@@ -182,7 +182,7 @@ func (sar *stepActionRemote) getActionModel() *model.Action {
 
 func (sar *stepActionRemote) getCompositeRunContext(ctx context.Context) *RunContext {
 	if sar.compositeRunContext == nil {
-		actionDir := fmt.Sprintf("%s/%s", sar.RunContext.ActionCacheDir(), strings.ReplaceAll(sar.Step.Uses, "/", "-"))
+		actionDir := fmt.Sprintf("%s/%s", sar.RunContext.ActionCacheDir(), safeFilename(sar.Step.Uses))
 		actionLocation := path.Join(actionDir, sar.remoteAction.Path)
 		_, containerActionDir := getContainerActionPaths(sar.getStepModel(), actionLocation, sar.RunContext)
 
@@ -269,4 +269,18 @@ func parseAction(action string) *remoteAction {
 		Ref:  matches[6],
 		URL:  "",
 	}
+}
+
+func safeFilename(s string) string {
+	return strings.NewReplacer(
+		`<`, "-",
+		`>`, "-",
+		`:`, "-",
+		`"`, "-",
+		`/`, "-",
+		`\`, "-",
+		`|`, "-",
+		`?`, "-",
+		`*`, "-",
+	).Replace(s)
 }
