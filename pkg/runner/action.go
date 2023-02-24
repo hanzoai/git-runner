@@ -473,7 +473,7 @@ func runPreStep(step actionStep) common.Executor {
 			var actionPath string
 			if _, ok := step.(*stepActionRemote); ok {
 				actionPath = newRemoteAction(stepModel.Uses).Path
-				actionDir = fmt.Sprintf("%s/%s", rc.ActionCacheDir(), strings.ReplaceAll(stepModel.Uses, "/", "-"))
+				actionDir = fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(stepModel.Uses))
 			} else {
 				actionDir = filepath.Join(rc.Config.Workdir, stepModel.Uses)
 				actionPath = ""
@@ -559,7 +559,7 @@ func runPostStep(step actionStep) common.Executor {
 		var actionPath string
 		if _, ok := step.(*stepActionRemote); ok {
 			actionPath = newRemoteAction(stepModel.Uses).Path
-			actionDir = fmt.Sprintf("%s/%s", rc.ActionCacheDir(), strings.ReplaceAll(stepModel.Uses, "/", "-"))
+			actionDir = fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(stepModel.Uses))
 		} else {
 			actionDir = filepath.Join(rc.Config.Workdir, stepModel.Uses)
 			actionPath = ""
