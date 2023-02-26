@@ -27,7 +27,7 @@ jobs:
         run: |
           apt update -y && apt install -y python python3-pip
           pip install awscli
-          rm dist/artifacts.json dist/metadata.json
+          rm dist/artifacts.json dist/metadata.json dist/config.yaml
           aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }}/act_runner/main/
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
