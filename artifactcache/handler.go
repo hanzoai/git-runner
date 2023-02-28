@@ -29,9 +29,7 @@ const (
 	urlBase = "/_apis/artifactcache"
 )
 
-var (
-	logger = log.StandardLogger().WithField("module", "cache_request")
-)
+var logger = log.StandardLogger().WithField("module", "cache_request")
 
 type Handler struct {
 	engine   engine
@@ -104,7 +102,7 @@ func NewHandler() (*Handler, error) {
 	}
 	go func() {
 		if err := http.Serve(listener, h.router); err != nil {
-			logger.Error("http serve: %v", err)
+			logger.Errorf("http serve: %v", err)
 		}
 	}()
 	h.listener = listener
