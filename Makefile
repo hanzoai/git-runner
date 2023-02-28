@@ -71,9 +71,6 @@ fmt:
 	fi
 	$(GOFMT) -w $(GOFILES)
 
-vet:
-	$(GO) vet ./...
-
 .PHONY: fmt-check
 fmt-check:
 	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
@@ -88,6 +85,12 @@ fmt-check:
 
 test: fmt-check
 	@$(GO) test -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
+
+.PHONY: vet
+vet:
+	@echo "Running go vet..."
+	@$(GO) build code.gitea.io/gitea-vet
+	@$(GO) vet -vettool=gitea-vet ./...
 
 install: $(GOFILES)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'
