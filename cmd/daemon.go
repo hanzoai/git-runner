@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"gitea.com/gitea/act_runner/artifactcache"
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/engine"
@@ -52,6 +53,12 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			}
 		}
 
+		handler, err := artifactcache.NewHandler()
+		if err != nil {
+			return err
+		}
+		log.Infof("cache handler listens on: %v", handler.ExternalURL())
+
 		var g errgroup.Group
 
 		cli := client.New(
@@ -67,6 +74,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			ForgeInstance: cfg.Client.Address,
 			Environ:       cfg.Runner.Environ,
 			Labels:        cfg.Runner.Labels,
+			CacheHandler:  handler,
 		}
 
 		poller := poller.New(
