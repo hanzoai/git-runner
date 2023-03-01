@@ -55,6 +55,8 @@ builds:
     - goos: freebsd
       goarch: arm
       goarm: "7"
+    - goos: freebsd
+      goarch: arm64
   flags:
   - -trimpath
   ldflags:
