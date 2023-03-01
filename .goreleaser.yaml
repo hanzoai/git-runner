@@ -14,8 +14,8 @@ builds:
   - amd64
   - arm
   - arm64
-  - s390x
-  - ppc64le
+#  - s390x
+#  - ppc64le
   goarm:
   - "5"
   - "6"
