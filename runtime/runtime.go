@@ -30,7 +30,7 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 		env[k] = v
 	}
 	env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
-	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task)
+	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine)
 }
 
 func (s *Runner) platformPicker(labels []string) string {
