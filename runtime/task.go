@@ -209,7 +209,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) (lastErr error) {
 
 	input := t.Input
 	config := &runner.Config{
-		Workdir:               "/" + preset.Repository,
+		Workdir:               "." + string(filepath.Separator),
 		BindWorkdir:           false,
 		ReuseContainers:       false,
 		ForcePull:             input.forcePull,
