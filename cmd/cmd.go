@@ -54,8 +54,10 @@ func Execute(ctx context.Context) {
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runDaemon(ctx, gArgs.EnvFile),
 	}
-	// add all command
 	rootCmd.AddCommand(daemonCmd)
+
+	// ./act_runner exec
+	rootCmd.AddCommand(loadExecCmd(ctx))
 
 	// hide completion command
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
