@@ -137,6 +137,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 				Data: log.Fields{
 					"jobResult": "failure",
 				},
+				Time: time.Now(),
 			})
 		}
 		_ = reporter.Close(lastWords)
