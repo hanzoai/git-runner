@@ -59,6 +59,7 @@ type Config struct {
 	ContainerNetworkMode  string                       // the network mode of job containers
 	DefaultActionInstance string                       // the default actions web site
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
+	JobLoggerLevel        *log.Level                   // the level of job logger
 }
 
 type runnerImpl struct {
