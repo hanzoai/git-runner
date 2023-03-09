@@ -182,6 +182,7 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 				model.ActionRunsUsingNode12,
 				model.ActionRunsUsingNode16,
 				model.ActionRunsUsingComposite,
+				model.ActionRunsUsingGo,
 			}, action.Runs.Using))
 		}
 	}
