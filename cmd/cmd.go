@@ -10,7 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.5"
+// the version of act_runner
+var version = "develop"
 
 type globalArgs struct {
 	EnvFile string
@@ -23,7 +24,7 @@ func Execute(ctx context.Context) {
 
 	// ./act_runner
 	rootCmd := &cobra.Command{
-		Use:          "act [event name to run]\nIf no event name passed, will default to \"on: push\"",
+		Use:          "act_runner [event name to run]\nIf no event name passed, will default to \"on: push\"",
 		Short:        "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
 		Args:         cobra.MaximumNArgs(1),
 		Version:      version,

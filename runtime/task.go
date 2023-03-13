@@ -115,7 +115,7 @@ func getToken(task *runnerv1.Task) string {
 	return token
 }
 
-func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) (lastErr error) {
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerVersion string) (lastErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
@@ -144,7 +144,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 	}()
 	reporter.RunDaemon()
 
-	reporter.Logf("%s received task %v of job %v", runnerName, task.Id, task.Context.Fields["job"].GetStringValue())
+	reporter.Logf("%s(version:%s) received task %v of job %v", runnerName, runnerVersion, task.Id, task.Context.Fields["job"].GetStringValue())
 
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {

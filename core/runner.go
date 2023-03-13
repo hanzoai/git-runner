@@ -4,8 +4,9 @@
 package core
 
 const (
-	UUIDHeader  = "x-runner-uuid"
-	TokenHeader = "x-runner-token"
+	UUIDHeader    = "x-runner-uuid"
+	TokenHeader   = "x-runner-token"
+	VersionHeader = "x-runner-version"
 )
 
 // Runner struct

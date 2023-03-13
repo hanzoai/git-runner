@@ -60,7 +60,7 @@ builds:
   flags:
   - -trimpath
   ldflags:
-  - -s -w
+  - -s -w -X gitea.com/gitea/act_runner/cmd.version={{ .Version }}
   binary: >-
     {{ .ProjectName }}-
     {{- if .IsSnapshot }}{{ .Branch }}-

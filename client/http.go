@@ -29,7 +29,7 @@ func getHttpClient(endpoint string, insecure bool) *http.Client {
 }
 
 // New returns a new runner client.
-func New(endpoint string, insecure bool, uuid, token string, opts ...connect.ClientOption) *HTTPClient {
+func New(endpoint string, insecure bool, uuid, token, runnerVersion string, opts ...connect.ClientOption) *HTTPClient {
 	baseURL := strings.TrimRight(endpoint, "/") + "/api/actions"
 
 	opts = append(opts, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
@@ -39,6 +39,9 @@ func New(endpoint string, insecure bool, uuid, token string, opts ...connect.Cli
 			}
 			if token != "" {
 				req.Header().Set(core.TokenHeader, token)
+			}
+			if runnerVersion != "" {
+				req.Header().Set(core.VersionHeader, runnerVersion)
 			}
 			return next(ctx, req)
 		}
