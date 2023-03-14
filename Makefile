@@ -14,7 +14,8 @@ RUNNER_CMD_PACKAGE_PATH := gitea.com/gitea/act_runner/cmd
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
-GOFILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
+GO_FMT_FILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
+GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
 
 ifneq ($(shell uname), Darwin)
 	EXTLDFLAGS = -extldflags "-static" $(null)
@@ -70,14 +71,14 @@ fmt:
 	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) install mvdan.cc/gofumpt@latest; \
 	fi
-	$(GOFMT) -w $(GOFILES)
+	$(GOFMT) -w $(GO_FMT_FILES)
 
 .PHONY: fmt-check
 fmt-check:
 	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) install mvdan.cc/gofumpt@latest; \
 	fi
-	@diff=$$($(GOFMT) -d $(GOFILES)); \
+	@diff=$$($(GOFMT) -d $(GO_FMT_FILES)); \
 	if [ -n "$$diff" ]; then \
 		echo "Please run 'make fmt' and commit the result:"; \
 		echo "$${diff}"; \
