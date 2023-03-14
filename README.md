@@ -1,18 +1,24 @@
 # act runner
 
-Act runner is a runner for Gitea based on [act](https://gitea.com/gitea/act).
+Act runner is a runner for Gitea based on [Gitea fork](https://gitea.com/gitea/act)  of [act](https://github.com/nektos/act) .
 
-## Prerequisites
+## Installation
+
+### Prerequisites
 
 Docker Engine Community version is required. To install Docker CE, follow the official [install instructions](https://docs.docker.com/engine/install/).
 
-## Quickstart
+### Download pre-built binary
 
-### Build
+Visit https://dl.gitea.com/act_runner/ and download the right version for your platform.
+
+### Build from source
 
 ```bash
 make build
 ```
+
+## Quickstart
 
 ### Register
 
