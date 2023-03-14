@@ -173,9 +173,15 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 			if err := maybeCopyToActionDir(ctx, step, actionDir, actionPath, containerActionDir); err != nil {
 				return err
 			}
-			containerArgs := []string{"go", "run", path.Join(containerActionDir, action.Runs.Main)}
-			logger.Debugf("executing remote job container: %s", containerArgs)
-			return rc.execJobContainer(containerArgs, *step.getEnv(), "", "")(ctx)
+
+			execFileName := fmt.Sprintf("%s.out", action.Runs.Main)
+			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Main}
+			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
+
+			return common.NewPipelineExecutor(
+				rc.execJobContainer(buildArgs, *step.getEnv(), "", containerActionDir),
+				rc.execJobContainer(execArgs, *step.getEnv(), "", ""),
+			)(ctx)
 		default:
 			return fmt.Errorf(fmt.Sprintf("The runs.using key must be one of: %v, got %s", []string{
 				model.ActionRunsUsingDocker,
@@ -451,7 +457,8 @@ func hasPreStep(step actionStep) common.Conditional {
 		action := step.getActionModel()
 		return action.Runs.Using == model.ActionRunsUsingComposite ||
 			((action.Runs.Using == model.ActionRunsUsingNode12 ||
-				action.Runs.Using == model.ActionRunsUsingNode16) &&
+				action.Runs.Using == model.ActionRunsUsingNode16 ||
+				action.Runs.Using == model.ActionRunsUsingGo) &&
 				action.Runs.Pre != "")
 	}
 }
@@ -505,6 +512,41 @@ func runPreStep(step actionStep) common.Executor {
 
 			return step.getCompositeSteps().pre(ctx)
 
+		case model.ActionRunsUsingGo:
+			// defaults in pre steps were missing, however provided inputs are available
+			populateEnvsFromInput(ctx, step.getEnv(), action, rc)
+			// todo: refactor into step
+			var actionDir string
+			var actionPath string
+			if _, ok := step.(*stepActionRemote); ok {
+				actionPath = newRemoteAction(stepModel.Uses).Path
+				actionDir = fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(stepModel.Uses))
+			} else {
+				actionDir = filepath.Join(rc.Config.Workdir, stepModel.Uses)
+				actionPath = ""
+			}
+
+			actionLocation := ""
+			if actionPath != "" {
+				actionLocation = path.Join(actionDir, actionPath)
+			} else {
+				actionLocation = actionDir
+			}
+
+			_, containerActionDir := getContainerActionPaths(stepModel, actionLocation, rc)
+
+			if err := maybeCopyToActionDir(ctx, step, actionDir, actionPath, containerActionDir); err != nil {
+				return err
+			}
+
+			execFileName := fmt.Sprintf("%s.out", action.Runs.Pre)
+			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Pre}
+			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
+
+			return common.NewPipelineExecutor(
+				rc.execJobContainer(buildArgs, *step.getEnv(), "", containerActionDir),
+				rc.execJobContainer(execArgs, *step.getEnv(), "", ""),
+			)(ctx)
 		default:
 			return nil
 		}
@@ -541,7 +583,8 @@ func hasPostStep(step actionStep) common.Conditional {
 		action := step.getActionModel()
 		return action.Runs.Using == model.ActionRunsUsingComposite ||
 			((action.Runs.Using == model.ActionRunsUsingNode12 ||
-				action.Runs.Using == model.ActionRunsUsingNode16) &&
+				action.Runs.Using == model.ActionRunsUsingNode16 ||
+				action.Runs.Using == model.ActionRunsUsingGo) &&
 				action.Runs.Post != "")
 	}
 }
@@ -591,6 +634,18 @@ func runPostStep(step actionStep) common.Executor {
 			}
 
 			return step.getCompositeSteps().post(ctx)
+
+		case model.ActionRunsUsingGo:
+			populateEnvsFromSavedState(step.getEnv(), step, rc)
+
+			execFileName := fmt.Sprintf("%s.out", action.Runs.Post)
+			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Post}
+			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
+
+			return common.NewPipelineExecutor(
+				rc.execJobContainer(buildArgs, *step.getEnv(), "", containerActionDir),
+				rc.execJobContainer(execArgs, *step.getEnv(), "", ""),
+			)(ctx)
 
 		default:
 			return nil
