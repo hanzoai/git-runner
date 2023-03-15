@@ -144,7 +144,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerV
 	}()
 	reporter.RunDaemon()
 
-	reporter.Logf("%s(version:%s) received task %v of job %v", runnerName, runnerVersion, task.Id, task.Context.Fields["job"].GetStringValue())
+	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", runnerName, runnerVersion, task.Id, task.Context.Fields["job"].GetStringValue(), task.Context.Fields["event_name"].GetStringValue())
 
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
