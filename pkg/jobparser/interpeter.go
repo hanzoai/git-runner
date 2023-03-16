@@ -41,11 +41,12 @@ func NewInterpeter(
 	jobs := run.Workflow.Jobs
 	jobNeeds := run.Job().Needs()
 
-	using := map[string]map[string]map[string]string{}
+	using := map[string]exprparser.Needs{}
 	for _, need := range jobNeeds {
 		if v, ok := jobs[need]; ok {
-			using[need] = map[string]map[string]string{
-				"outputs": v.Outputs,
+			using[need] = exprparser.Needs{
+				Outputs: v.Outputs,
+				Result:  v.Result,
 			}
 		}
 	}
