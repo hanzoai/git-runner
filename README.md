@@ -1,14 +1,25 @@
-## Naming rules:
+## Forking rules
+
+This is a custom fork of [nektos/act](https://github.com/nektos/act/), for the purpose of serving [act_runner](https://gitea.com/gitea/act_runner).
+
+It cannot be used as command line tool anymore, but only as a library.
+
+It's a soft fork, which means that it will tracking the latest release of nektos/act.
 
 Branches:
 
-- `main`: default branch, contains custom changes.
-- `nektos/master`: mirror for `master` of [nektos/act](https://github.com/nektos/act/).
+- `main`: default branch, contains custom changes, based on the latest release(not the latest of the master branch) of nektos/act.
+- `nektos/master`: mirror for the master branch of nektos/act.
 
 Tags:
 
-- `vX.YZ.*`: based on `nektos/vX.Y.Z`, contains custom changes.
 - `nektos/vX.Y.Z`: mirror for `vX.Y.Z` of [nektos/act](https://github.com/nektos/act/).
+- `vX.YZ.*`: based on `nektos/vX.Y.Z`, contains custom changes.
+  - Examples:
+    - `nektos/v0.2.23` -> `v0.223.*`
+    - `nektos/v0.3.1` -> `v0.301.*`, not ~~`v0.31.*`~~
+    - `nektos/v0.10.1` -> `v0.1001.*`, not ~~`v0.101.*`~~
+    - `nektos/v0.3.100` -> not ~~`v0.3100.*`~~, I don't think it's really going to happen, if it does, we can find a way to handle it.
 
 ---
 
