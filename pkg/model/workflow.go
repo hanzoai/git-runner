@@ -124,6 +124,48 @@ func (w *Workflow) WorkflowDispatchConfig() *WorkflowDispatch {
 	return &config
 }
 
+type WorkflowCallInput struct {
+	Description string `yaml:"description"`
+	Required    bool   `yaml:"required"`
+	Default     string `yaml:"default"`
+	Type        string `yaml:"type"`
+}
+
+type WorkflowCallOutput struct {
+	Description string `yaml:"description"`
+	Value       string `yaml:"value"`
+}
+
+type WorkflowCall struct {
+	Inputs  map[string]WorkflowCallInput  `yaml:"inputs"`
+	Outputs map[string]WorkflowCallOutput `yaml:"outputs"`
+}
+
+type WorkflowCallResult struct {
+	Outputs map[string]string
+}
+
+func (w *Workflow) WorkflowCallConfig() *WorkflowCall {
+	if w.RawOn.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	var val map[string]yaml.Node
+	err := w.RawOn.Decode(&val)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var config WorkflowCall
+	node := val["workflow_call"]
+	err = node.Decode(&config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &config
+}
+
 // Job is the structure of one job in a workflow
 type Job struct {
 	Name           string                    `yaml:"name"`
@@ -139,6 +181,8 @@ type Job struct {
 	Defaults       Defaults                  `yaml:"defaults"`
 	Outputs        map[string]string         `yaml:"outputs"`
 	Uses           string                    `yaml:"uses"`
+	With           map[string]interface{}    `yaml:"with"`
+	RawSecrets     yaml.Node                 `yaml:"secrets"`
 	Result         string
 }
 
@@ -191,6 +235,34 @@ func (s Strategy) GetFailFast() bool {
 		}
 	}
 	return failFast
+}
+
+func (j *Job) InheritSecrets() bool {
+	if j.RawSecrets.Kind != yaml.ScalarNode {
+		return false
+	}
+
+	var val string
+	err := j.RawSecrets.Decode(&val)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return val == "inherit"
+}
+
+func (j *Job) Secrets() map[string]string {
+	if j.RawSecrets.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	var val map[string]string
+	err := j.RawSecrets.Decode(&val)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return val
 }
 
 // Container details for the job
@@ -483,16 +555,8 @@ func (s *Step) String() string {
 }
 
 // Environments returns string-based key=value map for a step
-// Note: all keys are uppercase
 func (s *Step) Environment() map[string]string {
-	env := environment(s.Env)
-
-	for k, v := range env {
-		delete(env, k)
-		env[strings.ToUpper(k)] = v
-	}
-
-	return env
+	return environment(s.Env)
 }
 
 // GetEnv gets the env for a step

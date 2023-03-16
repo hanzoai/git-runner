@@ -2,9 +2,9 @@ package container
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,14 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"errors"
-
 	"github.com/go-git/go-billy/v5/helper/polyfill"
 	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
+	"golang.org/x/term"
+
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/lookpath"
-	"golang.org/x/term"
 )
 
 type HostEnvironment struct {
@@ -50,7 +49,7 @@ func (e *HostEnvironment) Close() common.Executor {
 func (e *HostEnvironment) Copy(destPath string, files ...*FileEntry) common.Executor {
 	return func(ctx context.Context) error {
 		for _, f := range files {
-			if err := os.MkdirAll(filepath.Dir(filepath.Join(destPath, f.Name)), 0777); err != nil {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(destPath, f.Name)), 0o777); err != nil {
 				return err
 			}
 			if err := os.WriteFile(filepath.Join(destPath, f.Name), []byte(f.Body), fs.FileMode(f.Mode)); err != nil {
@@ -341,77 +340,7 @@ func (e *HostEnvironment) Exec(command []string /*cmdline string, */, env map[st
 }
 
 func (e *HostEnvironment) UpdateFromEnv(srcPath string, env *map[string]string) common.Executor {
-	localEnv := *env
-	return func(ctx context.Context) error {
-		envTar, err := e.GetContainerArchive(ctx, srcPath)
-		if err != nil {
-			return nil
-		}
-		defer envTar.Close()
-		reader := tar.NewReader(envTar)
-		_, err = reader.Next()
-		if err != nil && err != io.EOF {
-			return err
-		}
-		s := bufio.NewScanner(reader)
-		for s.Scan() {
-			line := s.Text()
-			singleLineEnv := strings.Index(line, "=")
-			multiLineEnv := strings.Index(line, "<<")
-			if singleLineEnv != -1 && (multiLineEnv == -1 || singleLineEnv < multiLineEnv) {
-				localEnv[line[:singleLineEnv]] = line[singleLineEnv+1:]
-			} else if multiLineEnv != -1 {
-				multiLineEnvContent := ""
-				multiLineEnvDelimiter := line[multiLineEnv+2:]
-				delimiterFound := false
-				for s.Scan() {
-					content := s.Text()
-					if content == multiLineEnvDelimiter {
-						delimiterFound = true
-						break
-					}
-					if multiLineEnvContent != "" {
-						multiLineEnvContent += "\n"
-					}
-					multiLineEnvContent += content
-				}
-				if !delimiterFound {
-					return fmt.Errorf("invalid format delimiter '%v' not found before end of file", multiLineEnvDelimiter)
-				}
-				localEnv[line[:multiLineEnv]] = multiLineEnvContent
-			} else {
-				return fmt.Errorf("invalid format '%v', expected a line with '=' or '<<'", line)
-			}
-		}
-		env = &localEnv
-		return nil
-	}
-}
-
-func (e *HostEnvironment) UpdateFromPath(env *map[string]string) common.Executor {
-	localEnv := *env
-	return func(ctx context.Context) error {
-		pathTar, err := e.GetContainerArchive(ctx, localEnv["GITHUB_PATH"])
-		if err != nil {
-			return err
-		}
-		defer pathTar.Close()
-
-		reader := tar.NewReader(pathTar)
-		_, err = reader.Next()
-		if err != nil && err != io.EOF {
-			return err
-		}
-		s := bufio.NewScanner(reader)
-		for s.Scan() {
-			line := s.Text()
-			pathSep := string(filepath.ListSeparator)
-			localEnv[e.GetPathVariableName()] = fmt.Sprintf("%s%s%s", line, pathSep, localEnv[e.GetPathVariableName()])
-		}
-
-		env = &localEnv
-		return nil
-	}
+	return parseEnvFile(e, srcPath, env)
 }
 
 func (e *HostEnvironment) Remove() common.Executor {
@@ -454,10 +383,32 @@ func (*HostEnvironment) JoinPathVariable(paths ...string) string {
 	return strings.Join(paths, string(filepath.ListSeparator))
 }
 
+func goArchToActionArch(arch string) string {
+	archMapper := map[string]string{
+		"x86_64":  "X64",
+		"386":     "x86",
+		"aarch64": "arm64",
+	}
+	if arch, ok := archMapper[arch]; ok {
+		return arch
+	}
+	return arch
+}
+
+func goOsToActionOs(os string) string {
+	osMapper := map[string]string{
+		"darwin": "macOS",
+	}
+	if os, ok := osMapper[os]; ok {
+		return os
+	}
+	return os
+}
+
 func (e *HostEnvironment) GetRunnerContext(ctx context.Context) map[string]interface{} {
 	return map[string]interface{}{
-		"os":         runtime.GOOS,
-		"arch":       runtime.GOARCH,
+		"os":         goOsToActionOs(runtime.GOOS),
+		"arch":       goArchToActionArch(runtime.GOARCH),
 		"temp":       e.TmpDir,
 		"tool_cache": e.ToolCache,
 	}

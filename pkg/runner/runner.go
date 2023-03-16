@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -32,6 +33,7 @@ type Config struct {
 	LogOutput                          bool              // log the output from docker run
 	JSONLogger                         bool              // use json or text logger
 	Env                                map[string]string // env for containers
+	Inputs                             map[string]string // manually passed action inputs
 	Secrets                            map[string]string // list of secrets
 	Token                              string            // GitHub token
 	InsecureSecrets                    bool              // switch hiding output when printing to terminal
@@ -40,12 +42,14 @@ type Config struct {
 	UsernsMode                         string            // user namespace to use
 	ContainerArchitecture              string            // Desired OS/architecture platform for running containers
 	ContainerDaemonSocket              string            // Path to Docker daemon socket
+	ContainerOptions                   string            // Options for the job container
 	UseGitIgnore                       bool              // controls if paths in .gitignore should not be copied into container, default true
 	GitHubInstance                     string            // GitHub instance to use, default "github.com"
 	ContainerCapAdd                    []string          // list of kernel capabilities to add to the containers
 	ContainerCapDrop                   []string          // list of kernel capabilities to remove from the containers
 	AutoRemove                         bool              // controls if the container is automatically removed upon workflow completion
 	ArtifactServerPath                 string            // the path where the artifact server stores uploads
+	ArtifactServerAddr                 string            // the address the artifact server binds to
 	ArtifactServerPort                 string            // the port the artifact server binds to
 	NoSkipCheckout                     bool              // do not skip actions/checkout
 	RemoteName                         string            // remote name in local git repo config
@@ -62,9 +66,14 @@ type Config struct {
 	JobLoggerLevel        *log.Level                   // the level of job logger
 }
 
+type caller struct {
+	runContext *RunContext
+}
+
 type runnerImpl struct {
 	config    *Config
 	eventJSON string
+	caller    *caller // the job calling this runner (caller of a reusable workflow)
 }
 
 // New Creates a new Runner
@@ -73,39 +82,45 @@ func New(runnerConfig *Config) (Runner, error) {
 		config: runnerConfig,
 	}
 
+	return runner.configure()
+}
+
+func (runner *runnerImpl) configure() (Runner, error) {
 	runner.eventJSON = "{}"
-	if runnerConfig.EventJSON != "" {
-		runner.eventJSON = runnerConfig.EventJSON
-	} else if runnerConfig.EventPath != "" {
+	if runner.config.EventJSON != "" {
+		runner.eventJSON = runner.config.EventJSON
+	} else if runner.config.EventPath != "" {
 		log.Debugf("Reading event.json from %s", runner.config.EventPath)
 		eventJSONBytes, err := os.ReadFile(runner.config.EventPath)
 		if err != nil {
 			return nil, err
 		}
 		runner.eventJSON = string(eventJSONBytes)
+	} else if len(runner.config.Inputs) != 0 {
+		eventMap := map[string]map[string]string{
+			"inputs": runner.config.Inputs,
+		}
+		eventJSON, err := json.Marshal(eventMap)
+		if err != nil {
+			return nil, err
+		}
+		runner.eventJSON = string(eventJSON)
 	}
 	return runner, nil
 }
 
 // NewPlanExecutor ...
-//
-//nolint:gocyclo
 func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 	maxJobNameLen := 0
 
 	stagePipeline := make([]common.Executor, 0)
 	for i := range plan.Stages {
-		s := i
 		stage := plan.Stages[i]
 		stagePipeline = append(stagePipeline, func(ctx context.Context) error {
 			pipeline := make([]common.Executor, 0)
-			for r, run := range stage.Runs {
+			for _, run := range stage.Runs {
 				stageExecutor := make([]common.Executor, 0)
 				job := run.Job()
-
-				if job.Uses != "" {
-					return fmt.Errorf("reusable workflows are currently not supported (see https://github.com/nektos/act/issues/826 for updates)")
-				}
 
 				if job.Strategy != nil {
 					strategyRc := runner.newRunContext(ctx, run, nil)
@@ -134,29 +149,8 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 						maxJobNameLen = len(rc.String())
 					}
 					stageExecutor = append(stageExecutor, func(ctx context.Context) error {
-						logger := common.Logger(ctx)
 						jobName := fmt.Sprintf("%-*s", maxJobNameLen, rc.String())
-						return rc.Executor().Finally(func(ctx context.Context) error {
-							isLastRunningContainer := func(currentStage int, currentRun int) bool {
-								return currentStage == len(plan.Stages)-1 && currentRun == len(stage.Runs)-1
-							}
-
-							if runner.config.AutoRemove && isLastRunningContainer(s, r) {
-								var cancel context.CancelFunc
-								if ctx.Err() == context.Canceled {
-									ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-									defer cancel()
-								}
-
-								log.Infof("Cleaning up container for job %s", rc.JobName)
-
-								if err := rc.stopJobContainer()(ctx); err != nil {
-									logger.Errorf("Error while cleaning container: %v", err)
-								}
-							}
-
-							return nil
-						})(common.WithJobErrorContainer(WithJobLogger(ctx, rc.Run.JobID, jobName, rc.Config, &rc.Masks, matrix)))
+						return rc.Executor()(common.WithJobErrorContainer(WithJobLogger(ctx, rc.Run.JobID, jobName, rc.Config, &rc.Masks, matrix)))
 					})
 				}
 				pipeline = append(pipeline, common.NewParallelExecutor(maxParallel, stageExecutor...))
@@ -196,8 +190,10 @@ func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, mat
 		EventJSON:   runner.eventJSON,
 		StepResults: make(map[string]*model.StepResult),
 		Matrix:      matrix,
+		caller:      runner.caller,
 	}
 	rc.ExprEval = rc.NewExpressionEvaluator(ctx)
 	rc.Name = rc.ExprEval.Interpolate(ctx, run.String())
+
 	return rc
 }
