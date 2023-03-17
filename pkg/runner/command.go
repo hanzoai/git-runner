@@ -77,7 +77,8 @@ func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
 			logger.Infof("  \U00002753  %s", line)
 		}
 
-		return false
+		// return true to let gitea's logger handle these special outputs also
+		return true
 	}
 }
 
