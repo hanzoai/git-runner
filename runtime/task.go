@@ -14,7 +14,6 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
@@ -159,7 +158,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerV
 		return err
 	}
 
-	var plan *model.Plan
 	jobIDs := workflow.GetJobIDs()
 	if len(jobIDs) != 1 {
 		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
@@ -167,7 +165,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerV
 		return err
 	}
 	jobID := jobIDs[0]
-	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+	plan, err := model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+	if err != nil {
+		lastWords = err.Error()
+		return err
+	}
 	job := workflow.GetJob(jobID)
 	reporter.ResetSteps(len(job.Steps))
 
@@ -246,13 +248,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerV
 		return err
 	}
 
-	artifactCancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
-	t.log.Debugf("artifacts server started at %s:%s", input.artifactServerPath, input.artifactServerPort)
-
-	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
-		artifactCancel()
-		return nil
-	})
+	executor := r.NewPlanExecutor(plan)
 
 	t.log.Infof("workflow prepared")
 	reporter.Logf("workflow prepared")

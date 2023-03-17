@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/artifactcache"
 	"github.com/joho/godotenv"
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
@@ -22,6 +21,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"gitea.com/gitea/act_runner/artifactcache"
 )
 
 type executeArgs struct {
@@ -48,6 +49,7 @@ type executeArgs struct {
 	containerCapAdd       []string
 	containerCapDrop      []string
 	artifactServerPath    string
+	artifactServerAddr    string
 	artifactServerPort    string
 	noSkipCheckout        bool
 	debug                 bool
@@ -262,15 +264,25 @@ func runExecList(ctx context.Context, planner model.WorkflowPlanner, execArgs *e
 		filterEventName = events[0]
 	}
 
+	var err error
 	if execArgs.job != "" {
 		log.Infof("Preparing plan with a job: %s", execArgs.job)
-		filterPlan = planner.PlanJob(execArgs.job)
+		filterPlan, err = planner.PlanJob(execArgs.job)
+		if err != nil {
+			return err
+		}
 	} else if filterEventName != "" {
 		log.Infof("Preparing plan for a event: %s", filterEventName)
-		filterPlan = planner.PlanEvent(filterEventName)
+		filterPlan, err = planner.PlanEvent(filterEventName)
+		if err != nil {
+			return err
+		}
 	} else {
 		log.Infof("Preparing plan with all jobs")
-		filterPlan = planner.PlanAll()
+		filterPlan, err = planner.PlanAll()
+		if err != nil {
+			return err
+		}
 	}
 
 	printList(filterPlan)
@@ -317,10 +329,16 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		// build the plan for this run
 		if execArgs.job != "" {
 			log.Infof("Planning job: %s", execArgs.job)
-			plan = planner.PlanJob(execArgs.job)
+			plan, err = planner.PlanJob(execArgs.job)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Infof("Planning jobs for event: %s", eventName)
-			plan = planner.PlanEvent(eventName)
+			plan, err = planner.PlanEvent(eventName)
+			if err != nil {
+				return err
+			}
 		}
 
 		maxLifetime := 3 * time.Hour
@@ -393,7 +411,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			execArgs.artifactServerPath = tempDir
 		}
 
-		artifactCancel := artifacts.Serve(ctx, execArgs.artifactServerPath, execArgs.artifactServerPort)
+		artifactCancel := artifacts.Serve(ctx, execArgs.artifactServerPath, execArgs.artifactServerAddr, execArgs.artifactServerPort)
 		log.Debugf("artifacts server started at %s:%s", execArgs.artifactServerPath, execArgs.artifactServerPort)
 
 		ctx = common.WithDryrun(ctx, execArgs.dryrun)
