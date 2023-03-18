@@ -14,8 +14,6 @@ builds:
   - amd64
   - arm
   - arm64
-#  - s390x
-#  - ppc64le
   goarm:
   - "5"
   - "6"
@@ -63,8 +61,7 @@ builds:
   - -s -w -X gitea.com/gitea/act_runner/cmd.version={{ .Version }}
   binary: >-
     {{ .ProjectName }}-
-    {{- if .IsSnapshot }}{{ .Branch }}-
-    {{- else }}{{- .Version }}-{{ end }}
+    {{- .Version }}-
     {{- .Os }}-
     {{- if eq .Arch "amd64" }}amd64
     {{- else if eq .Arch "amd64_v1" }}amd64
@@ -72,6 +69,13 @@ builds:
     {{- else }}{{ .Arch }}{{ end }}
     {{- if .Arm }}-{{ .Arm }}{{ end }}
   no_unique_dist_dir: true
+  hooks:
+    post:
+      - cmd: tar -cJf {{ .Path }}.xz {{ .Path }}
+        env:
+          - XZ_OPT=-9
+      - cmd: sh .goreleaser.checksum.sh {{ .Path }}
+      - cmd: sh .goreleaser.checksum.sh {{ .Path }}.xz
 
 blobs:
   -
@@ -79,6 +83,9 @@ blobs:
     bucket: "{{ .Env.S3_BUCKET }}"
     region: "{{ .Env.S3_REGION }}"
     folder: "act_runner/{{.Version}}"
+    extra_files:
+      - glob: ./**.xz
+      - glob: ./**.sha256
 
 archives:
   - format: binary
@@ -87,10 +94,14 @@ archives:
 
 checksum:
   name_template: 'checksums.txt'
+  extra_files:
+      - glob: ./**.xz
 
 snapshot:
-  name_template: "{{ incpatch .Version }}"
+  name_template: "{{ .Branch }}-devel"
 
 nightly:
-  publish_release: false
   name_template: "{{ .Branch }}"
+
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
