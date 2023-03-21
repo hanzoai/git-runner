@@ -176,6 +176,8 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 				return err
 			}
 
+			rc.ApplyExtraPath(ctx, step.getEnv())
+
 			execFileName := fmt.Sprintf("%s.out", action.Runs.Main)
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Main}
 			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
@@ -554,6 +556,8 @@ func runPreStep(step actionStep) common.Executor {
 				return err
 			}
 
+			rc.ApplyExtraPath(ctx, step.getEnv())
+
 			execFileName := fmt.Sprintf("%s.out", action.Runs.Pre)
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Pre}
 			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
@@ -657,6 +661,7 @@ func runPostStep(step actionStep) common.Executor {
 
 		case model.ActionRunsUsingGo:
 			populateEnvsFromSavedState(step.getEnv(), step, rc)
+			rc.ApplyExtraPath(ctx, step.getEnv())
 
 			execFileName := fmt.Sprintf("%s.out", action.Runs.Post)
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Post}
