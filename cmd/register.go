@@ -229,7 +229,7 @@ func printStageHelp(stage registerStage) {
 		log.Infoln("Enter the runner token:")
 	case StageInputRunnerName:
 		hostname, _ := os.Hostname()
-		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
+		log.Infof("Enter the runner name (if set empty, use hostname: %s):\n", hostname)
 	case StageInputCustomLabels:
 		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, self-hosted,ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
 	case StageWaitingForRegistration:

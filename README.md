@@ -1,6 +1,6 @@
 # act runner
 
-Act runner is a runner for Gitea based on [Gitea fork](https://gitea.com/gitea/act)  of [act](https://github.com/nektos/act) .
+Act runner is a runner for Gitea based on [Gitea fork](https://gitea.com/gitea/act) of [act](https://github.com/nektos/act).
 
 ## Installation
 
@@ -43,7 +43,7 @@ INFO Enter the Gitea instance URL (for example, https://gitea.com/):
 http://192.168.8.8:3000/
 INFO Enter the runner token:
 fe884e8027dc292970d4e0303fe82b14xxxxxxxx
-INFO Enter the runner name (if set empty, use hostname:Test.local ):
+INFO Enter the runner name (if set empty, use hostname: Test.local):
 
 INFO Enter the runner labels, leave blank to use the default labels (comma-separated, for example, self-hosted,ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):
 
