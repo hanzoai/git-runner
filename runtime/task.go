@@ -212,7 +212,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerV
 
 	input := t.Input
 	config := &runner.Config{
-		Workdir:               "." + string(filepath.Separator),
+		// On Linux, Workdir will be like "/<owner>/<repo>"
+		// On Windows, Workdir will be like "\<owner>\<repo>"
+		Workdir:               filepath.FromSlash(string(filepath.Separator) + preset.Repository),
 		BindWorkdir:           false,
 		ReuseContainers:       false,
 		ForcePull:             input.forcePull,
