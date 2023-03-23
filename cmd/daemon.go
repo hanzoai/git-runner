@@ -6,7 +6,12 @@ package cmd
 import (
 	"context"
 	"os"
-	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/mattn/go-isatty"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"gitea.com/gitea/act_runner/artifactcache"
 	"gitea.com/gitea/act_runner/client"
@@ -14,12 +19,6 @@ import (
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
-
-	"github.com/joho/godotenv"
-	"github.com/mattn/go-isatty"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, args []string) error {
@@ -38,8 +37,8 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		// require docker if a runner label uses a docker backend
 		needsDocker := false
 		for _, l := range cfg.Runner.Labels {
-			splits := strings.SplitN(l, ":", 2)
-			if len(splits) == 2 && strings.HasPrefix(splits[1], "docker://") {
+			_, schema, _, _ := runtime.ParseLabel(l)
+			if schema == "docker" {
 				needsDocker = true
 				break
 			}
