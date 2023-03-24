@@ -47,7 +47,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "push",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"branches": {
 							"master",
 						},
@@ -60,7 +60,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "branch_protection_rule",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"types": {
 							"created",
 							"deleted",
@@ -74,7 +74,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "project",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"types": {
 							"created",
 							"deleted",
@@ -83,7 +83,7 @@ func TestParseRawOn(t *testing.T) {
 				},
 				{
 					Name: "milestone",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"types": {
 							"opened",
 							"deleted",
@@ -97,7 +97,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "pull_request",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"types": {
 							"opened",
 						},
@@ -113,7 +113,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "push",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"branches": {
 							"main",
 						},
@@ -121,7 +121,7 @@ func TestParseRawOn(t *testing.T) {
 				},
 				{
 					Name: "pull_request",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"types": {
 							"opened",
 						},
@@ -137,7 +137,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "push",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"branches": {
 							"main",
 							"releases/**",
@@ -151,7 +151,7 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "push",
-					Acts: map[string][]string{
+					acts: map[string][]string{
 						"tags": {
 							"v1.**",
 						},
@@ -167,6 +167,19 @@ func TestParseRawOn(t *testing.T) {
 				},
 				{
 					Name: "workflow_dispatch",
+				},
+			},
+		},
+		{
+			input: "on:\n  schedule:\n    - cron: '20 6 * * *'",
+			result: []*Event{
+				{
+					Name: "schedule",
+					schedules: []map[string]string{
+						{
+							"cron": "20 6 * * *",
+						},
+					},
 				},
 			},
 		},
