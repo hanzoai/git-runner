@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/nektos/act/pkg/common"
 	log "github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite"
 	"xorm.io/builder"
@@ -39,6 +38,8 @@ type Handler struct {
 
 	gc   atomic.Bool
 	gcAt time.Time
+
+	outboundIP string
 }
 
 func NewHandler() (*Handler, error) {
@@ -68,6 +69,12 @@ func NewHandler() (*Handler, error) {
 		return nil, err
 	}
 	h.storage = storage
+
+	if ip, err := getOutboundIP(); err != nil {
+		return nil, err
+	} else {
+		h.outboundIP = ip.String()
+	}
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: logger}))
@@ -113,7 +120,7 @@ func NewHandler() (*Handler, error) {
 func (h *Handler) ExternalURL() string {
 	// TODO: make the external url configurable if necessary
 	return fmt.Sprintf("http://%s:%d",
-		common.GetOutboundIP().String(),
+		h.outboundIP,
 		h.listener.Addr().(*net.TCPAddr).Port)
 }
 

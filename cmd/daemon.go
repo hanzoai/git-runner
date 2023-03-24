@@ -52,12 +52,6 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			}
 		}
 
-		handler, err := artifactcache.NewHandler()
-		if err != nil {
-			return err
-		}
-		log.Infof("cache handler listens on: %v", handler.ExternalURL())
-
 		var g errgroup.Group
 
 		cli := client.New(
@@ -75,7 +69,13 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			Environ:       cfg.Runner.Environ,
 			Labels:        cfg.Runner.Labels,
 			Version:       version,
-			CacheHandler:  handler,
+		}
+
+		if handler, err := artifactcache.NewHandler(); err != nil {
+			log.Errorf("cannot init cache server, it will be disabled: %v", err)
+		} else {
+			log.Infof("cache handler listens on: %v", handler.ExternalURL())
+			runner.CacheHandler = handler
 		}
 
 		poller := poller.New(

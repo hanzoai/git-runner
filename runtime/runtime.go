@@ -31,7 +31,9 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	for k, v := range s.Environ {
 		env[k] = v
 	}
-	env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
+	if s.CacheHandler != nil {
+		env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
+	}
 	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
 }
 

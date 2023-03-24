@@ -5,6 +5,7 @@ package artifactcache
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -44,8 +45,35 @@ func parseContentRange(s string) (int64, int64, error) {
 	return start, stop, nil
 }
 
+func getOutboundIP() (net.IP, error) {
+	// FIXME: It makes more sense to use the gateway IP address of container network
+	if conn, err := net.Dial("udp", "8.8.8.8:80"); err == nil {
+		defer conn.Close()
+		return conn.LocalAddr().(*net.UDPAddr).IP, nil
+	}
+	if ifaces, err := net.Interfaces(); err == nil {
+		for _, i := range ifaces {
+			if addrs, err := i.Addrs(); err == nil {
+				for _, addr := range addrs {
+					var ip net.IP
+					switch v := addr.(type) {
+					case *net.IPNet:
+						ip = v.IP
+					case *net.IPAddr:
+						ip = v.IP
+					}
+					if ip.IsGlobalUnicast() {
+						return ip, nil
+					}
+				}
+			}
+		}
+	}
+	return nil, fmt.Errorf("no outbound IP address found")
+}
+
 // engine is a wrapper of *xorm.Engine, with a lock.
-// To avoid racing of sqlite, we don't careperformance here.
+// To avoid racing of sqlite, we don't care performance here.
 type engine struct {
 	e *xorm.Engine
 	m sync.Mutex
