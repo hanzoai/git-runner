@@ -177,6 +177,13 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 		}
 		res := make([]*Event, 0, len(val))
 		for k, v := range val {
+			if v == nil {
+				res = append(res, &Event{
+					Name: k,
+					Acts: map[string][]string{},
+				})
+				continue
+			}
 			switch t := v.(type) {
 			case string:
 				res = append(res, &Event{
