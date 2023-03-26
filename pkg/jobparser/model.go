@@ -180,7 +180,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 			if v == nil {
 				res = append(res, &Event{
 					Name: k,
-					Acts: map[string][]string{},
+					acts: map[string][]string{},
 				})
 				continue
 			}
