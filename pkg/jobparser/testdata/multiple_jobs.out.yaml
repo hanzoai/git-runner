@@ -1,5 +1,13 @@
 name: test
 jobs:
+  zzz:
+    name: zzz
+    runs-on: linux
+    steps:
+      - run: echo zzz
+---
+name: test
+jobs:
   job1:
     name: job1
     runs-on: linux
@@ -18,6 +26,14 @@ name: test
 jobs:
   job3:
     name: job3
+    runs-on: linux
+    steps:
+      - run: uname -a && go version
+---
+name: test
+jobs:
+  aaa:
+    name: aaa
     runs-on: linux
     steps:
       - run: uname -a && go version

@@ -57,7 +57,10 @@ func TestParse(t *testing.T) {
 				}
 				encoder := yaml.NewEncoder(builder)
 				encoder.SetIndent(2)
-				_ = encoder.Encode(v)
+				require.NoError(t, encoder.Encode(v))
+				id, job := v.Job()
+				assert.NotEmpty(t, id)
+				assert.NotNil(t, job)
 			}
 			assert.Equal(t, string(want), builder.String())
 		})

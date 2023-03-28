@@ -12,15 +12,61 @@ type SingleWorkflow struct {
 	Name     string            `yaml:"name,omitempty"`
 	RawOn    yaml.Node         `yaml:"on,omitempty"`
 	Env      map[string]string `yaml:"env,omitempty"`
-	Jobs     map[string]*Job   `yaml:"jobs,omitempty"`
+	RawJobs  yaml.Node         `yaml:"jobs,omitempty"`
 	Defaults Defaults          `yaml:"defaults,omitempty"`
 }
 
 func (w *SingleWorkflow) Job() (string, *Job) {
-	for k, v := range w.Jobs {
-		return k, v
+	ids, jobs, _ := w.jobs()
+	if len(ids) >= 1 {
+		return ids[0], jobs[0]
 	}
 	return "", nil
+}
+
+func (w *SingleWorkflow) jobs() ([]string, []*Job, error) {
+	var ids []string
+	var jobs []*Job
+	expectKey := true
+	for _, item := range w.RawJobs.Content {
+		if expectKey {
+			if item.Kind != yaml.ScalarNode {
+				return nil, nil, fmt.Errorf("invalid job id: %v", item.Value)
+			}
+			ids = append(ids, item.Value)
+			expectKey = false
+		} else {
+			job := &Job{}
+			if err := item.Decode(job); err != nil {
+				return nil, nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+			}
+			jobs = append(jobs, job)
+			expectKey = true
+		}
+	}
+	if len(ids) != len(jobs) {
+		return nil, nil, fmt.Errorf("invalid jobs: %v", w.RawJobs.Value)
+	}
+	return ids, jobs, nil
+}
+
+func (w *SingleWorkflow) setJob(id string, job *Job) error {
+	m := map[string]*Job{
+		id: job,
+	}
+	out, err := yaml.Marshal(m)
+	if err != nil {
+		return err
+	}
+	node := yaml.Node{}
+	if err := yaml.Unmarshal(out, &node); err != nil {
+		return err
+	}
+	if len(node.Content) != 1 || node.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("can not set job: %q", out)
+	}
+	w.RawJobs = *node.Content[0]
+	return nil
 }
 
 func (w *SingleWorkflow) Marshal() ([]byte, error) {
