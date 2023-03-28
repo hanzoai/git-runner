@@ -102,7 +102,7 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 
 	var step *runnerv1.StepState
 	if v, ok := entry.Data["stepNumber"]; ok {
-		if v, ok := v.(int); ok {
+		if v, ok := v.(int); ok && len(r.state.Steps) > v {
 			step = r.state.Steps[v]
 		}
 	}
