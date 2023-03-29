@@ -54,6 +54,7 @@ type executeArgs struct {
 	noSkipCheckout        bool
 	debug                 bool
 	dryrun                bool
+	image                 string
 	cacheHandler          *artifactcache.Handler
 }
 
@@ -385,7 +386,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			ContainerNetworkMode:  "bridge",
 			DefaultActionInstance: execArgs.defaultActionsUrl,
 			PlatformPicker: func(_ []string) string {
-				return "node:16-bullseye"
+				return execArgs.image
 			},
 		}
 
@@ -461,6 +462,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.PersistentFlags().BoolVarP(&execArg.noSkipCheckout, "no-skip-checkout", "", false, "Do not skip actions/checkout")
 	execCmd.PersistentFlags().BoolVarP(&execArg.debug, "debug", "d", false, "enable debug log")
 	execCmd.PersistentFlags().BoolVarP(&execArg.dryrun, "dryrun", "n", false, "dryrun mode")
+	execCmd.PersistentFlags().StringVarP(&execArg.image, "image", "i", "node:16-bullseye", "docker image to use")
 
 	return execCmd
 }
