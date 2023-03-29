@@ -61,8 +61,8 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 				Env:      workflow.Env,
 				Defaults: workflow.Defaults,
 			}
-			if err := swf.setJob(id, job); err != nil {
-				return nil, fmt.Errorf("setJob: %w", err)
+			if err := swf.SetJob(id, job); err != nil {
+				return nil, fmt.Errorf("SetJob: %w", err)
 			}
 			ret = append(ret, swf)
 		}

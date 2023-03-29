@@ -50,7 +50,7 @@ func (w *SingleWorkflow) jobs() ([]string, []*Job, error) {
 	return ids, jobs, nil
 }
 
-func (w *SingleWorkflow) setJob(id string, job *Job) error {
+func (w *SingleWorkflow) SetJob(id string, job *Job) error {
 	m := map[string]*Job{
 		id: job,
 	}
@@ -114,8 +114,9 @@ func (j *Job) Needs() []string {
 	return (&model.Job{RawNeeds: j.RawNeeds}).Needs()
 }
 
-func (j *Job) EraseNeeds() {
+func (j *Job) EraseNeeds() *Job {
 	j.RawNeeds = yaml.Node{}
+	return j
 }
 
 func (j *Job) RunsOn() []string {

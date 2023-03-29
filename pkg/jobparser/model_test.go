@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseRawOn(t *testing.T) {
@@ -194,4 +197,26 @@ func TestParseRawOn(t *testing.T) {
 			assert.EqualValues(t, kase.result, events, fmt.Sprintf("%#v", events))
 		})
 	}
+}
+
+func TestSingleWorkflow_SetJob(t *testing.T) {
+	t.Run("erase needs", func(t *testing.T) {
+		content := ReadTestdata(t, "erase_needs.in.yaml")
+		want := ReadTestdata(t, "erase_needs.out.yaml")
+		swf, err := Parse(content)
+		require.NoError(t, err)
+		builder := &strings.Builder{}
+		for _, v := range swf {
+			id, job := v.Job()
+			require.NoError(t, v.SetJob(id, job.EraseNeeds()))
+
+			if builder.Len() > 0 {
+				builder.WriteString("---\n")
+			}
+			encoder := yaml.NewEncoder(builder)
+			encoder.SetIndent(2)
+			require.NoError(t, encoder.Encode(v))
+		}
+		assert.Equal(t, string(want), builder.String())
+	})
 }
