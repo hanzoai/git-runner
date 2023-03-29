@@ -506,7 +506,11 @@ func (j JobType) String() string {
 func (j *Job) Type() JobType {
 	if strings.HasPrefix(j.Uses, "./.github/workflows") && (strings.HasSuffix(j.Uses, ".yml") || strings.HasSuffix(j.Uses, ".yaml")) {
 		return JobTypeReusableWorkflowLocal
+	} else if strings.HasPrefix(j.Uses, "./.gitea/workflows") && (strings.HasSuffix(j.Uses, ".yml") || strings.HasSuffix(j.Uses, ".yaml")) {
+		return JobTypeReusableWorkflowLocal
 	} else if !strings.HasPrefix(j.Uses, "./") && strings.Contains(j.Uses, ".github/workflows") && (strings.Contains(j.Uses, ".yml@") || strings.Contains(j.Uses, ".yaml@")) {
+		return JobTypeReusableWorkflowRemote
+	} else if !strings.HasPrefix(j.Uses, "./") && strings.Contains(j.Uses, ".gitea/workflows") && (strings.Contains(j.Uses, ".yml@") || strings.Contains(j.Uses, ".yaml@")) {
 		return JobTypeReusableWorkflowRemote
 	}
 	return JobTypeDefault
