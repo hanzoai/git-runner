@@ -5,23 +5,18 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"gitea.com/gitea/act_runner/config"
 )
 
 // the version of act_runner
 var version = "develop"
 
-type globalArgs struct {
-	EnvFile string
-}
-
 func Execute(ctx context.Context) {
-	// task := runtime.NewTask("gitea", 0, nil, nil)
-
-	var gArgs globalArgs
-
 	// ./act_runner
 	rootCmd := &cobra.Command{
 		Use:          "act_runner [event name to run]\nIf no event name passed, will default to \"on: push\"",
@@ -30,7 +25,8 @@ func Execute(ctx context.Context) {
 		Version:      version,
 		SilenceUsage: true,
 	}
-	rootCmd.PersistentFlags().StringVarP(&gArgs.EnvFile, "env-file", "", ".env", "Read in a file of environment variables.")
+	configFile := ""
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Config file path")
 
 	// ./act_runner register
 	var regArgs registerArgs
@@ -38,11 +34,10 @@ func Execute(ctx context.Context) {
 		Use:   "register",
 		Short: "Register a runner to the server",
 		Args:  cobra.MaximumNArgs(0),
-		RunE:  runRegister(ctx, &regArgs, gArgs.EnvFile), // must use a pointer to regArgs
+		RunE:  runRegister(ctx, &regArgs, &configFile), // must use a pointer to regArgs
 	}
 	registerCmd.Flags().BoolVar(&regArgs.NoInteractive, "no-interactive", false, "Disable interactive mode")
 	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Gitea instance address")
-	registerCmd.Flags().BoolVar(&regArgs.Insecure, "insecure", false, "If check server's certificate if it's https protocol")
 	registerCmd.Flags().StringVar(&regArgs.Token, "token", "", "Runner token")
 	registerCmd.Flags().StringVar(&regArgs.RunnerName, "name", "", "Runner name")
 	registerCmd.Flags().StringVar(&regArgs.Labels, "labels", "", "Runner tags, comma separated")
@@ -53,12 +48,22 @@ func Execute(ctx context.Context) {
 		Use:   "daemon",
 		Short: "Run as a runner daemon",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  runDaemon(ctx, gArgs.EnvFile),
+		RunE:  runDaemon(ctx, &configFile),
 	}
 	rootCmd.AddCommand(daemonCmd)
 
 	// ./act_runner exec
 	rootCmd.AddCommand(loadExecCmd(ctx))
+
+	// ./act_runner config
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "generate-config",
+		Short: "Generate an example config file",
+		Args:  cobra.MaximumNArgs(0),
+		Run: func(_ *cobra.Command, _ []string) {
+			fmt.Printf("%s", config.Example)
+		},
+	})
 
 	// hide completion command
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true

@@ -65,3 +65,20 @@ If the registry succeed, it will run immediately. Next time, you could run the r
 ```bash
 ./act_runner daemon
 ```
+
+
+### Configuration
+
+You can also configure the runner with a configuration file.
+The configuration file is a YAML file, you can generate a sample configuration file with `./act_runner generate-config`.
+
+```bash
+./act_runner generate-config > config.yaml
+```
+
+You can specify the configuration file path with `-c`/`--config` argument.
+
+```bash
+./act_runner -c config.yaml register # register with config file
+./act_runner -c config.yaml deamon # run with config file
+```

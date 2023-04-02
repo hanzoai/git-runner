@@ -42,14 +42,15 @@ type Handler struct {
 	outboundIP string
 }
 
-func NewHandler() (*Handler, error) {
+func NewHandler(dir, outboundIP string, port uint16) (*Handler, error) {
 	h := &Handler{}
 
-	dir := "" // TODO: make the dir configurable if necessary
-	if home, err := os.UserHomeDir(); err != nil {
-		return nil, err
-	} else {
-		dir = filepath.Join(home, ".cache/actcache")
+	if dir == "" {
+		if home, err := os.UserHomeDir(); err != nil {
+			return nil, err
+		} else {
+			dir = filepath.Join(home, ".cache", "actcache")
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
@@ -70,7 +71,9 @@ func NewHandler() (*Handler, error) {
 	}
 	h.storage = storage
 
-	if ip, err := getOutboundIP(); err != nil {
+	if outboundIP != "" {
+		h.outboundIP = outboundIP
+	} else if ip, err := getOutboundIP(); err != nil {
 		return nil, err
 	} else {
 		h.outboundIP = ip.String()
@@ -102,8 +105,7 @@ func NewHandler() (*Handler, error) {
 
 	h.gcCache()
 
-	// TODO: make the port configurable if necessary
-	listener, err := net.Listen("tcp", ":0") // random available port
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port)) // listen on all interfaces
 	if err != nil {
 		return nil, err
 	}

@@ -4,115 +4,84 @@
 package config
 
 import (
-	"encoding/json"
-	"io"
+	"fmt"
 	"os"
-	"runtime"
-	"strconv"
-
-	"gitea.com/gitea/act_runner/core"
+	"path/filepath"
+	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/kelseyhightower/envconfig"
+	"gopkg.in/yaml.v3"
 )
 
-type (
-	// Config provides the system configuration.
-	Config struct {
-		Debug    bool `envconfig:"GITEA_DEBUG"`
-		Trace    bool `envconfig:"GITEA_TRACE"`
-		Client   Client
-		Runner   Runner
-		Platform Platform
-	}
-
-	Client struct {
-		Address  string `ignored:"true"`
-		Insecure bool
-	}
-
+type Config struct {
+	Log struct {
+		Level string `yaml:"level"`
+	} `yaml:"log"`
 	Runner struct {
-		UUID     string            `ignored:"true"`
-		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
-		Token    string            `ignored:"true"`
-		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
-		File     string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
-		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
-		EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
-		Labels   []string          `envconfig:"GITEA_RUNNER_LABELS"`
-	}
+		File     string            `yaml:"file"`
+		Capacity int               `yaml:"capacity"`
+		Envs     map[string]string `yaml:"envs"`
+		EnvFile  string            `yaml:"env_file"`
+		Timeout  time.Duration     `yaml:"timeout"`
+		Insecure bool              `yaml:"insecure"`
+	} `yaml:"runner"`
+	Cache struct {
+		Enabled *bool  `yaml:"enabled"` // pointer to distinguish between false and not set, and it will be true if not set
+		Dir     string `yaml:"dir"`
+		Host    string `yaml:"host"`
+		Port    uint16 `yaml:"port"`
+	} `yaml:"cache"`
+}
 
-	Platform struct {
-		OS   string `envconfig:"GITEA_PLATFORM_OS"`
-		Arch string `envconfig:"GITEA_PLATFORM_ARCH"`
-	}
-)
-
-// FromEnviron returns the settings from the environment.
-func FromEnviron() (Config, error) {
-	cfg := Config{}
-	if err := envconfig.Process("", &cfg); err != nil {
-		return cfg, err
-	}
-
-	// check runner config exist
-	f, err := os.Stat(cfg.Runner.File)
-	if err == nil && !f.IsDir() {
-		jsonFile, _ := os.Open(cfg.Runner.File)
-		defer jsonFile.Close()
-		byteValue, _ := io.ReadAll(jsonFile)
-		var runner core.Runner
-		if err := json.Unmarshal(byteValue, &runner); err != nil {
-			return cfg, err
-		}
-		if runner.UUID != "" {
-			cfg.Runner.UUID = runner.UUID
-		}
-		if runner.Name != "" {
-			cfg.Runner.Name = runner.Name
-		}
-		if runner.Token != "" {
-			cfg.Runner.Token = runner.Token
-		}
-		if len(runner.Labels) != 0 {
-			cfg.Runner.Labels = runner.Labels
-		}
-		if runner.Address != "" {
-			cfg.Client.Address = runner.Address
-		}
-		if runner.Insecure != "" {
-			cfg.Client.Insecure, _ = strconv.ParseBool(runner.Insecure)
-		}
-	} else if err != nil {
-		return cfg, err
-	}
-
-	// runner config
-	if cfg.Runner.Environ == nil {
-		cfg.Runner.Environ = map[string]string{
-			"GITHUB_API_URL":    cfg.Client.Address + "/api/v1",
-			"GITHUB_SERVER_URL": cfg.Client.Address,
-		}
-	}
-	if cfg.Runner.Name == "" {
-		cfg.Runner.Name, _ = os.Hostname()
-	}
-
-	// platform config
-	if cfg.Platform.OS == "" {
-		cfg.Platform.OS = runtime.GOOS
-	}
-	if cfg.Platform.Arch == "" {
-		cfg.Platform.Arch = runtime.GOARCH
-	}
-
-	if file := cfg.Runner.EnvFile; file != "" {
-		envs, err := godotenv.Read(file)
+// LoadDefault returns the default configuration.
+// If file is not empty, it will be used to load the configuration.
+func LoadDefault(file string) (*Config, error) {
+	cfg := &Config{}
+	if file != "" {
+		f, err := os.Open(file)
 		if err != nil {
-			return cfg, err
+			return nil, err
 		}
-		for k, v := range envs {
-			cfg.Runner.Environ[k] = v
+		defer f.Close()
+		decoder := yaml.NewDecoder(f)
+		if err := decoder.Decode(&cfg); err != nil {
+			return nil, err
+		}
+	}
+	compatibleWithOldEnvs(file != "", cfg)
+
+	if cfg.Runner.EnvFile != "" {
+		if stat, err := os.Stat(cfg.Runner.EnvFile); err == nil && !stat.IsDir() {
+			envs, err := godotenv.Read(cfg.Runner.EnvFile)
+			if err != nil {
+				return nil, fmt.Errorf("read env file %q: %w", cfg.Runner.EnvFile, err)
+			}
+			for k, v := range envs {
+				cfg.Runner.Envs[k] = v
+			}
+		}
+	}
+
+	if cfg.Log.Level == "" {
+		cfg.Log.Level = "info"
+	}
+	if cfg.Runner.File == "" {
+		cfg.Runner.File = ".runner"
+	}
+	if cfg.Runner.Capacity <= 0 {
+		cfg.Runner.Capacity = 1
+	}
+	if cfg.Runner.Timeout <= 0 {
+		cfg.Runner.Timeout = 3 * time.Hour
+	}
+	if cfg.Cache.Enabled == nil {
+		b := true
+		cfg.Cache.Enabled = &b
+	}
+	if *cfg.Cache.Enabled {
+		if cfg.Cache.Dir == "" {
+			home, _ := os.UserHomeDir()
+			cfg.Cache.Dir = filepath.Join(home, ".cache", "actcache")
 		}
 	}
 

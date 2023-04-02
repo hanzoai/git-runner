@@ -11,7 +11,6 @@ import (
 
 	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
 	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
-	"gitea.com/gitea/act_runner/core"
 	"github.com/bufbuild/connect-go"
 )
 
@@ -35,13 +34,13 @@ func New(endpoint string, insecure bool, uuid, token, runnerVersion string, opts
 	opts = append(opts, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			if uuid != "" {
-				req.Header().Set(core.UUIDHeader, uuid)
+				req.Header().Set(UUIDHeader, uuid)
 			}
 			if token != "" {
-				req.Header().Set(core.TokenHeader, token)
+				req.Header().Set(TokenHeader, token)
 			}
 			if runnerVersion != "" {
-				req.Header().Set(core.VersionHeader, runnerVersion)
+				req.Header().Set(VersionHeader, runnerVersion)
 			}
 			return next(ctx, req)
 		}

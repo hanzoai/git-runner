@@ -5,9 +5,9 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,22 +21,28 @@ import (
 	"gitea.com/gitea/act_runner/runtime"
 )
 
-func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, args []string) error {
+func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		log.Infoln("Starting runner daemon")
 
-		_ = godotenv.Load(envFile)
-		cfg, err := config.FromEnviron()
+		cfg, err := config.LoadDefault(*configFile)
 		if err != nil {
-			log.WithError(err).
-				Fatalln("invalid configuration")
+			return fmt.Errorf("invalid configuration: %w", err)
 		}
 
 		initLogging(cfg)
 
+		reg, err := config.LoadRegistration(cfg.Runner.File)
+		if os.IsNotExist(err) {
+			log.Error("registration file not found, please register the runner first")
+			return err
+		} else if err != nil {
+			return fmt.Errorf("failed to load registration file: %w", err)
+		}
+
 		// require docker if a runner label uses a docker backend
 		needsDocker := false
-		for _, l := range cfg.Runner.Labels {
+		for _, l := range reg.Labels {
 			_, schema, _, _ := runtime.ParseLabel(l)
 			if schema == "docker" {
 				needsDocker = true
@@ -55,40 +61,40 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		var g errgroup.Group
 
 		cli := client.New(
-			cfg.Client.Address,
-			cfg.Client.Insecure,
-			cfg.Runner.UUID,
-			cfg.Runner.Token,
+			reg.Address,
+			cfg.Runner.Insecure,
+			reg.UUID,
+			reg.Token,
 			version,
 		)
 
 		runner := &runtime.Runner{
 			Client:        cli,
-			Machine:       cfg.Runner.Name,
-			ForgeInstance: cfg.Client.Address,
-			Environ:       cfg.Runner.Environ,
-			Labels:        cfg.Runner.Labels,
+			Machine:       reg.Name,
+			ForgeInstance: reg.Address,
+			Environ:       cfg.Runner.Envs,
+			Labels:        reg.Labels,
 			Version:       version,
 		}
 
-		if handler, err := artifactcache.NewHandler(); err != nil {
-			log.Errorf("cannot init cache server, it will be disabled: %v", err)
-		} else {
-			log.Infof("cache handler listens on: %v", handler.ExternalURL())
-			runner.CacheHandler = handler
+		if *cfg.Cache.Enabled {
+			if handler, err := artifactcache.NewHandler(cfg.Cache.Dir, cfg.Cache.Host, cfg.Cache.Port); err != nil {
+				log.Errorf("cannot init cache server, it will be disabled: %v", err)
+			} else {
+				log.Infof("cache handler listens on: %v", handler.ExternalURL())
+				runner.CacheHandler = handler
+			}
 		}
 
 		poller := poller.New(
 			cli,
 			runner.Run,
-			cfg.Runner.Capacity,
+			cfg,
 		)
 
 		g.Go(func() error {
 			l := log.WithField("capacity", cfg.Runner.Capacity).
-				WithField("endpoint", cfg.Client.Address).
-				WithField("os", cfg.Platform.OS).
-				WithField("arch", cfg.Platform.Arch)
+				WithField("endpoint", reg.Address)
 			l.Infoln("polling the remote server")
 
 			if err := poller.Poll(ctx); err != nil {
@@ -108,17 +114,22 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 }
 
 // initLogging setup the global logrus logger.
-func initLogging(cfg config.Config) {
+func initLogging(cfg *config.Config) {
 	isTerm := isatty.IsTerminal(os.Stdout.Fd())
 	log.SetFormatter(&log.TextFormatter{
 		DisableColors: !isTerm,
 		FullTimestamp: true,
 	})
 
-	if cfg.Debug {
-		log.SetLevel(log.DebugLevel)
-	}
-	if cfg.Trace {
-		log.SetLevel(log.TraceLevel)
+	if l := cfg.Log.Level; l != "" {
+		level, err := log.ParseLevel(l)
+		if err != nil {
+			log.WithError(err).
+				Errorf("invalid log level: %q", l)
+		}
+		if log.GetLevel() != level {
+			log.Infof("log level changed to %v", level)
+			log.SetLevel(level)
+		}
 	}
 }

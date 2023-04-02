@@ -11,7 +11,6 @@ require (
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
 	github.com/joho/godotenv v1.5.1
-	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mattn/go-isatty v0.0.17
 	github.com/nektos/act v0.0.0
 	github.com/sirupsen/logrus v1.9.0
@@ -19,6 +18,7 @@ require (
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.6.0
 	google.golang.org/protobuf v1.28.1
+	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.14.2
 	xorm.io/builder v0.3.11-0.20220531020008-1bd24a7dc978
 	xorm.io/xorm v1.3.2
@@ -91,7 +91,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.1.1 // indirect
 	modernc.org/cc/v3 v3.35.18 // indirect
 	modernc.org/ccgo/v3 v3.12.82 // indirect
