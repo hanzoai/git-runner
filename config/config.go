@@ -31,6 +31,9 @@ type Config struct {
 		Host    string `yaml:"host"`
 		Port    uint16 `yaml:"port"`
 	} `yaml:"cache"`
+	Container struct {
+		Network string `yaml:"network"`
+	}
 }
 
 // LoadDefault returns the default configuration.
@@ -83,6 +86,9 @@ func LoadDefault(file string) (*Config, error) {
 			home, _ := os.UserHomeDir()
 			cfg.Cache.Dir = filepath.Join(home, ".cache", "actcache")
 		}
+	}
+	if cfg.Container.Network == "" {
+		cfg.Container.Network = "bridge"
 	}
 
 	return cfg, nil

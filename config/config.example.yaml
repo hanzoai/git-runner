@@ -36,3 +36,7 @@ cache:
   # The port of the cache server.
   # 0 means to use a random available port.
   port: 0
+
+container:
+  # Which network to use for the job containers.
+  network: bridge

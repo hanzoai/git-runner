@@ -74,11 +74,11 @@ type Task struct {
 }
 
 // NewTask creates a new task
-func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string, picker func([]string) string) *Task {
+func NewTask(buildID int64, client client.Client, runnerEnvs map[string]string, network string, picker func([]string) string) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			envs:                 runnerEnvs,
-			containerNetworkMode: "bridge", // TODO should be configurable
+			containerNetworkMode: network,
 		},
 		BuildID: buildID,
 
