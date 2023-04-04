@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"gitea.com/gitea/act_runner/artifactcache"
+	"gitea.com/gitea/act_runner/internal/app/artifactcache"
 )
 
 type executeArgs struct {
@@ -348,7 +348,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		}
 
 		// init a cache server
-		handler, err := artifactcache.NewHandler("", "", 0)
+		handler, err := artifactcache.StartHandler("", "", 0)
 		if err != nil {
 			return err
 		}

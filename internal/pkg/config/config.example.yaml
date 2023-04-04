@@ -38,5 +38,5 @@ cache:
   port: 0
 
 container:
-  # Which network to use for the job containers.
-  network: bridge
+  # Which network to use for the job containers. Could be bridge, host, none, or the name of a custom network.
+  network_mode: bridge

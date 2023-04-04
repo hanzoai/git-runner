@@ -1,7 +1,7 @@
 // Copyright 2022 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-package runtime
+package report
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
-
 	retry "github.com/avast/retry-go/v4"
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"gitea.com/gitea/act_runner/internal/pkg/client"
 )
 
 type Reporter struct {
@@ -179,6 +179,7 @@ func (r *Reporter) Close(lastWords string) error {
 				v.Result = runnerv1.Result_RESULT_CANCELLED
 			}
 		}
+		r.state.Result = runnerv1.Result_RESULT_FAILURE
 		r.logRows = append(r.logRows, &runnerv1.LogRow{
 			Time:    timestamppb.Now(),
 			Content: lastWords,

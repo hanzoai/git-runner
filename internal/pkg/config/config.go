@@ -32,7 +32,7 @@ type Config struct {
 		Port    uint16 `yaml:"port"`
 	} `yaml:"cache"`
 	Container struct {
-		Network string `yaml:"network"`
+		NetworkMode string `yaml:"network_mode"`
 	}
 }
 
@@ -87,8 +87,8 @@ func LoadDefault(file string) (*Config, error) {
 			cfg.Cache.Dir = filepath.Join(home, ".cache", "actcache")
 		}
 	}
-	if cfg.Container.Network == "" {
-		cfg.Container.Network = "bridge"
+	if cfg.Container.NetworkMode == "" {
+		cfg.Container.NetworkMode = "bridge"
 	}
 
 	return cfg, nil

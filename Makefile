@@ -9,7 +9,6 @@ HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
 XGO_PACKAGE ?= src.techknowlogick.com/xgo@latest
 XGO_VERSION := go-1.18.x
 GXZ_PAGAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
-RUNNER_CMD_PACKAGE_PATH := gitea.com/gitea/act_runner/cmd
 
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
@@ -63,7 +62,7 @@ else
 endif
 
 TAGS ?=
-LDFLAGS ?= -X "$(RUNNER_CMD_PACKAGE_PATH).version=$(RELASE_VERSION)"
+LDFLAGS ?= -X "gitea.com/gitea/act_runner/internal/pkg/ver.version=$(RELASE_VERSION)"
 
 all: build
 

@@ -20,9 +20,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/runtime"
+	"gitea.com/gitea/act_runner/internal/pkg/client"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/labels"
+	"gitea.com/gitea/act_runner/internal/pkg/ver"
 )
 
 // runRegister registers a runner to the server
@@ -37,7 +38,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs, configFile *string)
 		log.SetLevel(log.DebugLevel)
 
 		log.Infof("Registering runner, arch=%s, os=%s, version=%s.",
-			goruntime.GOARCH, goruntime.GOOS, version)
+			goruntime.GOARCH, goruntime.GOOS, ver.Version())
 
 		// runner always needs root permission
 		if os.Getuid() != 0 {
@@ -116,9 +117,9 @@ func (r *registerInputs) validate() error {
 	return nil
 }
 
-func validateLabels(labels []string) error {
-	for _, label := range labels {
-		if _, _, _, err := runtime.ParseLabel(label); err != nil {
+func validateLabels(ls []string) error {
+	for _, label := range ls {
+		if _, err := labels.Parse(label); err != nil {
 			return err
 		}
 	}
@@ -272,7 +273,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 		cfg.Runner.Insecure,
 		"",
 		"",
-		version,
+		ver.Version(),
 	)
 
 	for {
@@ -305,16 +306,16 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 		Labels:  inputs.CustomLabels,
 	}
 
-	labels := make([]string, len(reg.Labels))
+	ls := make([]string, len(reg.Labels))
 	for i, v := range reg.Labels {
-		l, _, _, _ := runtime.ParseLabel(v)
-		labels[i] = l
+		l, _ := labels.Parse(v)
+		ls[i] = l.Name
 	}
 	// register new runner.
 	resp, err := cli.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
 		Name:        reg.Name,
 		Token:       reg.Token,
-		AgentLabels: labels,
+		AgentLabels: ls,
 	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")

@@ -58,7 +58,7 @@ builds:
   flags:
   - -trimpath
   ldflags:
-  - -s -w -X gitea.com/gitea/act_runner/cmd.version={{ .Summary }}
+  - -s -w -X gitea.com/gitea/act_runner/internal/pkg/ver.version={{ .Summary }}
   binary: >-
     {{ .ProjectName }}-
     {{- .Version }}-

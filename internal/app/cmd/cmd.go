@@ -10,11 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitea.com/gitea/act_runner/config"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/ver"
 )
-
-// the version of act_runner
-var version = "develop"
 
 func Execute(ctx context.Context) {
 	// ./act_runner
@@ -22,7 +20,7 @@ func Execute(ctx context.Context) {
 		Use:          "act_runner [event name to run]\nIf no event name passed, will default to \"on: push\"",
 		Short:        "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
 		Args:         cobra.MaximumNArgs(1),
-		Version:      version,
+		Version:      ver.Version(),
 		SilenceUsage: true,
 	}
 	configFile := ""

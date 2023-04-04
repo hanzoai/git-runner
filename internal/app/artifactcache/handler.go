@@ -42,7 +42,7 @@ type Handler struct {
 	outboundIP string
 }
 
-func NewHandler(dir, outboundIP string, port uint16) (*Handler, error) {
+func StartHandler(dir, outboundIP string, port uint16) (*Handler, error) {
 	h := &Handler{}
 
 	if dir == "" {
