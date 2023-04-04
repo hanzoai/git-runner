@@ -87,6 +87,7 @@ type Job struct {
 	Defaults       Defaults                  `yaml:"defaults,omitempty"`
 	Outputs        map[string]string         `yaml:"outputs,omitempty"`
 	Uses           string                    `yaml:"uses,omitempty"`
+	With           map[string]interface{}    `yaml:"with,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -107,6 +108,7 @@ func (j *Job) Clone() *Job {
 		Defaults:       j.Defaults,
 		Outputs:        j.Outputs,
 		Uses:           j.Uses,
+		With:           j.With,
 	}
 }
 
