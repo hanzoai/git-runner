@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"github.com/bufbuild/connect-go"
@@ -20,23 +19,23 @@ import (
 )
 
 type Poller struct {
-	client   client.Client
-	runner   *run.Runner
-	capacity int
+	client client.Client
+	runner *run.Runner
+	cfg    *config.Config
 }
 
 func New(cfg *config.Config, client client.Client, runner *run.Runner) *Poller {
 	return &Poller{
-		client:   client,
-		runner:   runner,
-		capacity: cfg.Runner.Capacity,
+		client: client,
+		runner: runner,
+		cfg:    cfg,
 	}
 }
 
 func (p *Poller) Poll(ctx context.Context) {
-	limiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
+	limiter := rate.NewLimiter(rate.Every(p.cfg.Runner.FetchInterval), 1)
 	wg := &sync.WaitGroup{}
-	for i := 0; i < p.capacity; i++ {
+	for i := 0; i < p.cfg.Runner.Capacity; i++ {
 		wg.Add(1)
 		go p.poll(ctx, wg, limiter)
 	}
@@ -63,7 +62,7 @@ func (p *Poller) poll(ctx context.Context, wg *sync.WaitGroup, limiter *rate.Lim
 }
 
 func (p *Poller) fetchTask(ctx context.Context) (*runnerv1.Task, bool) {
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	reqCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.FetchTimeout)
 	defer cancel()
 
 	resp, err := p.client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{}))

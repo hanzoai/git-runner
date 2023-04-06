@@ -18,12 +18,14 @@ type Config struct {
 		Level string `yaml:"level"`
 	} `yaml:"log"`
 	Runner struct {
-		File     string            `yaml:"file"`
-		Capacity int               `yaml:"capacity"`
-		Envs     map[string]string `yaml:"envs"`
-		EnvFile  string            `yaml:"env_file"`
-		Timeout  time.Duration     `yaml:"timeout"`
-		Insecure bool              `yaml:"insecure"`
+		File          string            `yaml:"file"`
+		Capacity      int               `yaml:"capacity"`
+		Envs          map[string]string `yaml:"envs"`
+		EnvFile       string            `yaml:"env_file"`
+		Timeout       time.Duration     `yaml:"timeout"`
+		Insecure      bool              `yaml:"insecure"`
+		FetchTimeout  time.Duration     `yaml:"fetch_timeout"`
+		FetchInterval time.Duration     `yaml:"fetch_interval"`
 	} `yaml:"runner"`
 	Cache struct {
 		Enabled *bool  `yaml:"enabled"` // pointer to distinguish between false and not set, and it will be true if not set
@@ -89,6 +91,12 @@ func LoadDefault(file string) (*Config, error) {
 	}
 	if cfg.Container.NetworkMode == "" {
 		cfg.Container.NetworkMode = "bridge"
+	}
+	if cfg.Runner.FetchTimeout <= 0 {
+		cfg.Runner.FetchTimeout = 5 * time.Second
+	}
+	if cfg.Runner.FetchInterval <= 0 {
+		cfg.Runner.FetchInterval = 2 * time.Second
 	}
 
 	return cfg, nil
