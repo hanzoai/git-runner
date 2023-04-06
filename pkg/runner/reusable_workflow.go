@@ -30,8 +30,11 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 
 	workflowDir := fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(uses))
 
+	// If the repository is private, we need a token to clone it
+	token := rc.Config.GetToken()
+
 	return common.NewPipelineExecutor(
-		newMutexExecutor(cloneIfRequired(rc, *remoteReusableWorkflow, workflowDir)),
+		newMutexExecutor(cloneIfRequired(rc, *remoteReusableWorkflow, workflowDir, token)),
 		newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath()),
 	)
 }
@@ -47,8 +50,11 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 
 	workflowDir := fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(uses))
 
+	// FIXME: if the reusable workflow is from a private repository, we need to provide a token to access the repository.
+	token := ""
+
 	return common.NewPipelineExecutor(
-		newMutexExecutor(cloneIfRequired(rc, *remoteReusableWorkflow, workflowDir)),
+		newMutexExecutor(cloneIfRequired(rc, *remoteReusableWorkflow, workflowDir, token)),
 		newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath()),
 	)
 }
@@ -66,7 +72,7 @@ func newMutexExecutor(executor common.Executor) common.Executor {
 	}
 }
 
-func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkflow, targetDirectory string) common.Executor {
+func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkflow, targetDirectory, token string) common.Executor {
 	return common.NewConditionalExecutor(
 		func(ctx context.Context) bool {
 			_, err := os.Stat(targetDirectory)
@@ -77,7 +83,7 @@ func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkfl
 			URL:   remoteReusableWorkflow.CloneURL(),
 			Ref:   remoteReusableWorkflow.Ref,
 			Dir:   targetDirectory,
-			Token: rc.Config.Token,
+			Token: token,
 		}),
 		nil,
 	)
