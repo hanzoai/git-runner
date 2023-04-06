@@ -74,7 +74,7 @@ func (p *Poller) fetchTask(ctx context.Context) (*runnerv1.Task, bool) {
 		return nil, false
 	}
 
-	if resp.Msg.Task == nil {
+	if resp == nil || resp.Msg == nil || resp.Msg.Task == nil {
 		return nil, false
 	}
 	return resp.Msg.Task, true
