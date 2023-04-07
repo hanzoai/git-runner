@@ -42,7 +42,11 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 	}
 	for i, id := range ids {
 		job := jobs[i]
-		for _, matrix := range getMatrixes(origin.GetJob(id)) {
+		matricxes, err := getMatrixes(origin.GetJob(id))
+		if err != nil {
+			return nil, fmt.Errorf("getMatrixes: %w", err)
+		}
+		for _, matrix := range matricxes {
 			job := job.Clone()
 			if job.Name == "" {
 				job.Name = id
@@ -89,12 +93,15 @@ type parseContext struct {
 
 type ParseOption func(c *parseContext)
 
-func getMatrixes(job *model.Job) []map[string]interface{} {
-	ret := job.GetMatrixes()
+func getMatrixes(job *model.Job) ([]map[string]interface{}, error) {
+	ret, err := job.GetMatrixes()
+	if err != nil {
+		return nil, fmt.Errorf("GetMatrixes: %w", err)
+	}
 	sort.Slice(ret, func(i, j int) bool {
 		return matrixName(ret[i]) < matrixName(ret[j])
 	})
-	return ret
+	return ret, nil
 }
 
 func encodeMatrix(matrix map[string]interface{}) yaml.Node {
