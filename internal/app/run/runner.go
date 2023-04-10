@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -59,6 +60,10 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 			envs["ACTIONS_CACHE_URL"] = cacheHandler.ExternalURL() + "/"
 		}
 	}
+
+	// set artifact gitea api
+	artifactGiteaAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
+	envs["ACTIONS_RUNTIME_URL"] = artifactGiteaAPI
 
 	return &Runner{
 		name:   reg.Name,
@@ -148,6 +153,9 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 	} else if t := task.Secrets["GITHUB_TOKEN"]; t != "" {
 		preset.Token = t
 	}
+
+	// use task token to action api token
+	r.envs["ACTIONS_RUNTIME_TOKEN"] = preset.Token
 
 	eventJSON, err := json.Marshal(preset.Event)
 	if err != nil {
