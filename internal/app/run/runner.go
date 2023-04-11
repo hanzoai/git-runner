@@ -188,6 +188,8 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%d", task.Id),
 		ContainerMaxLifetime:  maxLifetime,
 		ContainerNetworkMode:  r.cfg.Container.NetworkMode,
+		ContainerOptions:      r.cfg.Container.Options,
+		Privileged:            r.cfg.Container.Privileged,
 		DefaultActionInstance: taskContext["gitea_default_actions_url"].GetStringValue(),
 		PlatformPicker:        r.labels.PickPlatform,
 	}

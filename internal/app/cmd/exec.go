@@ -48,6 +48,7 @@ type executeArgs struct {
 	useGitIgnore          bool
 	containerCapAdd       []string
 	containerCapDrop      []string
+	containerOptions      string
 	artifactServerPath    string
 	artifactServerAddr    string
 	artifactServerPort    string
@@ -375,6 +376,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			// GitHubInstance:        t.client.Address(),
 			ContainerCapAdd:    execArgs.containerCapAdd,
 			ContainerCapDrop:   execArgs.containerCapDrop,
+			ContainerOptions:   execArgs.containerOptions,
 			AutoRemove:         true,
 			ArtifactServerPath: execArgs.artifactServerPath,
 			ArtifactServerPort: execArgs.artifactServerPort,
@@ -456,6 +458,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.Flags().BoolVar(&execArg.useGitIgnore, "use-gitignore", true, "Controls whether paths specified in .gitignore should be copied into container")
 	execCmd.Flags().StringArrayVarP(&execArg.containerCapAdd, "container-cap-add", "", []string{}, "kernel capabilities to add to the workflow containers (e.g. --container-cap-add SYS_PTRACE)")
 	execCmd.Flags().StringArrayVarP(&execArg.containerCapDrop, "container-cap-drop", "", []string{}, "kernel capabilities to remove from the workflow containers (e.g. --container-cap-drop SYS_PTRACE)")
+	execCmd.Flags().StringVarP(&execArg.containerOptions, "container-opts", "", "", "container options")
 	execCmd.PersistentFlags().StringVarP(&execArg.artifactServerPath, "artifact-server-path", "", ".", "Defines the path where the artifact server stores uploads and retrieves downloads from. If not specified the artifact server will not start.")
 	execCmd.PersistentFlags().StringVarP(&execArg.artifactServerPort, "artifact-server-port", "", "34567", "Defines the port where the artifact server listens (will only bind to localhost).")
 	execCmd.PersistentFlags().StringVarP(&execArg.defaultActionsUrl, "default-actions-url", "", "https://gitea.com", "Defines the default url of action instance.")

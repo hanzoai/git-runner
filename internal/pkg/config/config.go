@@ -35,7 +35,9 @@ type Config struct {
 	} `yaml:"cache"`
 	Container struct {
 		NetworkMode string `yaml:"network_mode"`
-	}
+		Privileged  bool   `yaml:"privileged"`
+		Options     string `yaml:"options"`
+	} `yaml:"container"`
 }
 
 // LoadDefault returns the default configuration.
