@@ -70,7 +70,19 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 			return common.NewErrorExecutor(err)
 		}
 
-		preSteps = append(preSteps, useStepLogger(rc, stepModel, stepStagePre, step.pre()))
+		preExec := step.pre()
+		preSteps = append(preSteps, useStepLogger(rc, stepModel, stepStagePre, func(ctx context.Context) error {
+			logger := common.Logger(ctx)
+			preErr := preExec(ctx)
+			if preErr != nil {
+				logger.Errorf("%v", preErr)
+				common.SetJobError(ctx, preErr)
+			} else if ctx.Err() != nil {
+				logger.Errorf("%v", ctx.Err())
+				common.SetJobError(ctx, ctx.Err())
+			}
+			return preErr
+		}))
 
 		stepExec := step.main()
 		steps = append(steps, useStepLogger(rc, stepModel, stepStageMain, func(ctx context.Context) error {
