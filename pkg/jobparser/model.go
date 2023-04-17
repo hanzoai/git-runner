@@ -88,6 +88,7 @@ type Job struct {
 	Outputs        map[string]string         `yaml:"outputs,omitempty"`
 	Uses           string                    `yaml:"uses,omitempty"`
 	With           map[string]interface{}    `yaml:"with,omitempty"`
+	RawSecrets     yaml.Node                 `yaml:"secrets,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -109,6 +110,7 @@ func (j *Job) Clone() *Job {
 		Outputs:        j.Outputs,
 		Uses:           j.Uses,
 		With:           j.With,
+		RawSecrets:     j.RawSecrets,
 	}
 }
 
