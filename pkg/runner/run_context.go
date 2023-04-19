@@ -271,6 +271,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				UsernsMode:     rc.Config.UsernsMode,
 				Platform:       rc.Config.ContainerArchitecture,
 				AutoRemove:     rc.Config.AutoRemove,
+				Options:        spec.Options,
 				NetworkAliases: []string{name},
 			})
 			rc.ServiceContainers = append(rc.ServiceContainers, c)
