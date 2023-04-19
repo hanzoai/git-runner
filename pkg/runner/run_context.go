@@ -683,6 +683,10 @@ func (rc *RunContext) getStepsContext() map[string]*model.StepResult {
 	return rc.StepResults
 }
 
+func (rc *RunContext) getVarsContext() map[string]string {
+	return rc.Config.Vars
+}
+
 func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext {
 	logger := common.Logger(ctx)
 	ghc := &model.GithubContext{

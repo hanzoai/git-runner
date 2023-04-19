@@ -81,6 +81,8 @@ func (rc *RunContext) NewExpressionEvaluatorWithEnv(ctx context.Context, env map
 		Matrix:   rc.Matrix,
 		Needs:    using,
 		Inputs:   inputs,
+
+		Vars: rc.getVarsContext(),
 	}
 	if rc.JobContainer != nil {
 		ee.Runner = rc.JobContainer.GetRunnerContext(ctx)
@@ -130,6 +132,8 @@ func (rc *RunContext) NewStepExpressionEvaluator(ctx context.Context, step step)
 		// todo: should be unavailable
 		// but required to interpolate/evaluate the inputs in actions/composite
 		Inputs: inputs,
+
+		Vars: rc.getVarsContext(),
 	}
 	if rc.JobContainer != nil {
 		ee.Runner = rc.JobContainer.GetRunnerContext(ctx)

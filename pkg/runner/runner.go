@@ -64,6 +64,7 @@ type Config struct {
 	DefaultActionInstance string                       // the default actions web site
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
+	Vars                  map[string]string            // the list of variables set at the repository, environment, or organization levels.
 }
 
 func (c Config) GetToken() string {

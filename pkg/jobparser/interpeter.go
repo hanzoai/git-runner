@@ -62,6 +62,8 @@ func NewInterpeter(
 		Matrix:   matrix,
 		Needs:    using,
 		Inputs:   nil, // not supported yet
+
+		Vars: nil,
 	}
 
 	config := exprparser.Config{
