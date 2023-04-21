@@ -143,6 +143,9 @@ type Step struct {
 
 // String gets the name of step
 func (s *Step) String() string {
+	if s == nil {
+		return ""
+	}
 	return (&model.Step{
 		ID:   s.ID,
 		Name: s.Name,
