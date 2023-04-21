@@ -40,6 +40,13 @@ func (w *SingleWorkflow) jobs() ([]string, []*Job, error) {
 			if err := item.Decode(job); err != nil {
 				return nil, nil, fmt.Errorf("yaml.Unmarshal: %w", err)
 			}
+			steps := make([]*Step, 0, len(job.Steps))
+			for _, s := range job.Steps {
+				if s != nil {
+					steps = append(steps, s)
+				}
+			}
+			job.Steps = steps
 			jobs = append(jobs, job)
 			expectKey = true
 		}
