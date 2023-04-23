@@ -522,6 +522,9 @@ type ContainerSpec struct {
 	Args        string
 	Name        string
 	Reuse       bool
+
+	// Gitea specific
+	Cmd []string `yaml:"cmd"`
 }
 
 // Step is the structure of one step in a job

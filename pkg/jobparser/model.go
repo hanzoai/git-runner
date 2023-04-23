@@ -168,6 +168,7 @@ type ContainerSpec struct {
 	Volumes     []string          `yaml:"volumes,omitempty"`
 	Options     string            `yaml:"options,omitempty"`
 	Credentials map[string]string `yaml:"credentials,omitempty"`
+	Cmd         []string          `yaml:"cmd,omitempty"`
 }
 
 type Strategy struct {

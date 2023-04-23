@@ -246,6 +246,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 
 		// add service containers
 		for name, spec := range rc.Run.Job().Services {
+			// interpolate env
 			interpolatedEnvs := make(map[string]string, len(spec.Env))
 			for k, v := range spec.Env {
 				interpolatedEnvs[k] = rc.ExprEval.Interpolate(ctx, v)
@@ -254,6 +255,11 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			for k, v := range interpolatedEnvs {
 				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 			}
+			// interpolate cmd
+			interpolatedCmd := make([]string, 0, len(spec.Cmd))
+			for _, v := range spec.Cmd {
+				interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
+			}
 			serviceContainerName := createSimpleContainerName(rc.jobContainerName(), name)
 			c := container.NewContainer(&container.NewContainerInput{
 				Name:       serviceContainerName,
@@ -261,6 +267,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				Image:      spec.Image,
 				Username:   username,
 				Password:   password,
+				Cmd:        interpolatedCmd,
 				Env:        envs,
 				Mounts: map[string]string{
 					// TODO merge volumes
