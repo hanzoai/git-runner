@@ -220,3 +220,87 @@ func TestSingleWorkflow_SetJob(t *testing.T) {
 		assert.Equal(t, string(want), builder.String())
 	})
 }
+
+func TestParseMappingNode(t *testing.T) {
+	tests := []struct {
+		input   string
+		scalars []string
+		datas   []interface{}
+	}{
+		{
+			input:   "on:\n  push:\n    branches:\n      - master",
+			scalars: []string{"push"},
+			datas: []interface {
+			}{
+				map[string]interface{}{
+					"branches": []interface{}{"master"},
+				},
+			},
+		},
+		{
+			input:   "on:\n  branch_protection_rule:\n    types: [created, deleted]",
+			scalars: []string{"branch_protection_rule"},
+			datas: []interface{}{
+				map[string]interface{}{
+					"types": []interface{}{"created", "deleted"},
+				},
+			},
+		},
+		{
+			input:   "on:\n  project:\n    types: [created, deleted]\n  milestone:\n    types: [opened, deleted]",
+			scalars: []string{"project", "milestone"},
+			datas: []interface{}{
+				map[string]interface{}{
+					"types": []interface{}{"created", "deleted"},
+				},
+				map[string]interface{}{
+					"types": []interface{}{"opened", "deleted"},
+				},
+			},
+		},
+		{
+			input:   "on:\n  pull_request:\n    types:\n      - opened\n    branches:\n      - 'releases/**'",
+			scalars: []string{"pull_request"},
+			datas: []interface{}{
+				map[string]interface{}{
+					"types":    []interface{}{"opened"},
+					"branches": []interface{}{"releases/**"},
+				},
+			},
+		},
+		{
+			input:   "on:\n  push:\n    branches:\n      - main\n  pull_request:\n    types:\n      - opened\n    branches:\n      - '**'",
+			scalars: []string{"push", "pull_request"},
+			datas: []interface{}{
+				map[string]interface{}{
+					"branches": []interface{}{"main"},
+				},
+				map[string]interface{}{
+					"types":    []interface{}{"opened"},
+					"branches": []interface{}{"**"},
+				},
+			},
+		},
+		{
+			input:   "on:\n  schedule:\n    - cron: '20 6 * * *'",
+			scalars: []string{"schedule"},
+			datas: []interface{}{
+				[]interface{}{map[string]interface{}{
+					"cron": "20 6 * * *",
+				}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			workflow, err := model.ReadWorkflow(strings.NewReader(test.input))
+			assert.NoError(t, err)
+
+			scalars, datas, err := parseMappingNode[interface{}](&workflow.RawOn)
+			assert.NoError(t, err)
+			assert.EqualValues(t, test.scalars, scalars, fmt.Sprintf("%#v", scalars))
+			assert.EqualValues(t, test.datas, datas, fmt.Sprintf("%#v", datas))
+		})
+	}
+}
