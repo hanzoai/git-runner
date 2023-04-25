@@ -260,6 +260,10 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			for _, v := range spec.Cmd {
 				interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
 			}
+			username, password, err := rc.handleServiceCredentials(ctx, spec.Credentials)
+			if err != nil {
+				return fmt.Errorf("failed to handle service %s credentials: %w", name, err)
+			}
 			serviceContainerName := createSimpleContainerName(rc.jobContainerName(), name)
 			c := container.NewContainer(&container.NewContainerInput{
 				Name:       serviceContainerName,
@@ -967,4 +971,27 @@ func (rc *RunContext) handleCredentials(ctx context.Context) (username, password
 	}
 
 	return username, password, err
+}
+
+func (rc *RunContext) handleServiceCredentials(ctx context.Context, creds map[string]string) (username, password string, err error) {
+	if creds == nil {
+		return
+	}
+	if len(creds) != 2 {
+		err = fmt.Errorf("invalid property count for key 'credentials:'")
+		return
+	}
+
+	ee := rc.NewExpressionEvaluator(ctx)
+	if username = ee.Interpolate(ctx, creds["username"]); username == "" {
+		err = fmt.Errorf("failed to interpolate credentials.username")
+		return
+	}
+
+	if password = ee.Interpolate(ctx, creds["password"]); password == "" {
+		err = fmt.Errorf("failed to interpolate credentials.password")
+		return
+	}
+
+	return
 }
