@@ -58,9 +58,8 @@ func (w *Workflow) On() []string {
 func (w *Workflow) OnEvent(event string) interface{} {
 	if w.RawOn.Kind == yaml.MappingNode {
 		var val map[string]interface{}
-		err := w.RawOn.Decode(&val)
-		if err != nil {
-			log.Fatal(err)
+		if !decodeNode(w.RawOn, &val) {
+			return nil
 		}
 		return val[event]
 	}
@@ -109,16 +108,14 @@ func (w *Workflow) WorkflowDispatchConfig() *WorkflowDispatch {
 	}
 
 	var val map[string]yaml.Node
-	err := w.RawOn.Decode(&val)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(w.RawOn, &val) {
+		return nil
 	}
 
 	var config WorkflowDispatch
 	node := val["workflow_dispatch"]
-	err = node.Decode(&config)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(node, &config) {
+		return nil
 	}
 
 	return &config
@@ -147,20 +144,19 @@ type WorkflowCallResult struct {
 
 func (w *Workflow) WorkflowCallConfig() *WorkflowCall {
 	if w.RawOn.Kind != yaml.MappingNode {
-		return nil
+		// The callers expect for "on: workflow_call" and "on: [ workflow_call ]" a non nil return value
+		return &WorkflowCall{}
 	}
 
 	var val map[string]yaml.Node
-	err := w.RawOn.Decode(&val)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(w.RawOn, &val) {
+		return &WorkflowCall{}
 	}
 
 	var config WorkflowCall
 	node := val["workflow_call"]
-	err = node.Decode(&config)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(node, &config) {
+		return &WorkflowCall{}
 	}
 
 	return &config
@@ -243,9 +239,8 @@ func (j *Job) InheritSecrets() bool {
 	}
 
 	var val string
-	err := j.RawSecrets.Decode(&val)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(j.RawSecrets, &val) {
+		return false
 	}
 
 	return val == "inherit"
@@ -257,9 +252,8 @@ func (j *Job) Secrets() map[string]string {
 	}
 
 	var val map[string]string
-	err := j.RawSecrets.Decode(&val)
-	if err != nil {
-		log.Fatal(err)
+	if !decodeNode(j.RawSecrets, &val) {
+		return nil
 	}
 
 	return val
