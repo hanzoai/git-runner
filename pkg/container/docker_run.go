@@ -366,11 +366,15 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 		return nil, nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", input.Options, err)
 	}
 
-	if len(copts.netMode.Value()) == 0 {
-		if err = copts.netMode.Set("host"); err != nil {
-			return nil, nil, fmt.Errorf("Cannot parse networkmode=host. This is an internal error and should not happen: '%w'", err)
-		}
-	}
+	// If a service container's network is set to `host`, the container will not be able to
+	// connect to the specified network created for the job container and the service containers.
+	// So comment out the following code.
+
+	// if len(copts.netMode.Value()) == 0 {
+	// 	if err = copts.netMode.Set("host"); err != nil {
+	// 		return nil, nil, fmt.Errorf("Cannot parse networkmode=host. This is an internal error and should not happen: '%w'", err)
+	// 	}
+	// }
 
 	containerConfig, err := parse(flags, copts, "")
 	if err != nil {
