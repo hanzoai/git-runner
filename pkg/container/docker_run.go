@@ -376,6 +376,12 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	// 	}
 	// }
 
+	// If the `privileged` config has been disabled, `copts.privileged` need to be forced to false,
+	// even if the user specifies `--privileged` in the options string.
+	if !hostConfig.Privileged {
+		copts.privileged = false
+	}
+
 	containerConfig, err := parse(flags, copts, "")
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot process container options: '%s': '%w'", input.Options, err)
