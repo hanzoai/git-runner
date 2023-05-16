@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/api/types/network"
 	networktypes "github.com/docker/docker/api/types/network"
 
 	"github.com/go-git/go-billy/v5/helper/polyfill"
@@ -477,7 +478,21 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 			return err
 		}
 
-		resp, err := cr.cli.ContainerCreate(ctx, config, hostConfig, nil, platSpecs, input.Name)
+		// For Gitea
+		// network-scoped alias is supported only for containers in user defined networks
+		var networkingConfig *network.NetworkingConfig
+		if hostConfig.NetworkMode.IsUserDefined() && len(input.NetworkAliases) > 0 {
+			endpointConfig := &network.EndpointSettings{
+				Aliases: input.NetworkAliases,
+			}
+			networkingConfig = &network.NetworkingConfig{
+				EndpointsConfig: map[string]*network.EndpointSettings{
+					input.NetworkMode: endpointConfig,
+				},
+			}
+		}
+
+		resp, err := cr.cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, platSpecs, input.Name)
 		if err != nil {
 			return fmt.Errorf("failed to create container: '%w'", err)
 		}

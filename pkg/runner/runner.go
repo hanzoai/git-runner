@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	docker_container "github.com/docker/docker/api/types/container"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/model"
@@ -61,7 +62,7 @@ type Config struct {
 	EventJSON             string                       // the content of JSON file to use for event.json in containers, overrides EventPath
 	ContainerNamePrefix   string                       // the prefix of container name
 	ContainerMaxLifetime  time.Duration                // the max lifetime of job containers
-	ContainerNetworkMode  string                       // the network mode of job containers
+	ContainerNetworkMode  docker_container.NetworkMode // the network mode of job containers (the value of --network)
 	DefaultActionInstance string                       // the default actions web site
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
