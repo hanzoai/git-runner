@@ -390,7 +390,7 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 
 	logger.Debugf("Custom container.Config from options ==> %+v", containerConfig.Config)
 
-	err = mergo.Merge(config, containerConfig.Config, mergo.WithOverride)
+	err = mergo.Merge(config, containerConfig.Config, mergo.WithOverride, mergo.WithAppendSlice)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot merge container.Config options: '%s': '%w'", input.Options, err)
 	}
@@ -402,12 +402,17 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	hostConfig.Mounts = append(hostConfig.Mounts, containerConfig.HostConfig.Mounts...)
 	binds := hostConfig.Binds
 	mounts := hostConfig.Mounts
+	networkMode := hostConfig.NetworkMode
 	err = mergo.Merge(hostConfig, containerConfig.HostConfig, mergo.WithOverride)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot merge container.HostConfig options: '%s': '%w'", input.Options, err)
 	}
 	hostConfig.Binds = binds
 	hostConfig.Mounts = mounts
+	if len(copts.netMode.Value()) > 0 {
+		logger.Warn("--network and --net in the options will be ignored.")
+	}
+	hostConfig.NetworkMode = networkMode
 	logger.Debugf("Merged container.HostConfig ==> %+v", hostConfig)
 
 	return config, hostConfig, nil
