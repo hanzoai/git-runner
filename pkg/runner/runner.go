@@ -68,6 +68,7 @@ type Config struct {
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
 	Vars                  map[string]string            // the list of variables set at the repository, environment, or organization levels.
+	ValidVolumes          []string                     // only volumes (and bind mounts) in this slice can be mounted on the job container or service containers
 }
 
 // GetToken: Adapt to Gitea

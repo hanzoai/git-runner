@@ -28,6 +28,7 @@ import (
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/cli/cli/compose/loader"
 	"github.com/docker/cli/cli/connhelper"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -484,6 +485,9 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		}
 
 		// For Gitea
+		config, hostConfig = cr.sanitizeConfig(ctx, config, hostConfig)
+
+		// For Gitea
 		// network-scoped alias is supported only for containers in user defined networks
 		var networkingConfig *network.NetworkingConfig
 		if hostConfig.NetworkMode.IsUserDefined() && len(input.NetworkAliases) > 0 {
@@ -877,4 +881,47 @@ func (cr *containerReference) wait() common.Executor {
 
 		return fmt.Errorf("exit with `FAILURE`: %v", statusCode)
 	}
+}
+
+func (cr *containerReference) sanitizeConfig(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig) {
+	logger := common.Logger(ctx)
+
+	if len(cr.input.ValidVolumes) > 0 {
+		vv := make(map[string]struct{}, len(cr.input.ValidVolumes))
+		for _, volume := range cr.input.ValidVolumes {
+			vv[volume] = struct{}{}
+		}
+		// sanitize binds
+		sanitizedBinds := make([]string, 0, len(hostConfig.Binds))
+		for _, bind := range hostConfig.Binds {
+			parsed, err := loader.ParseVolume(bind)
+			if err != nil {
+				logger.Warnf("parse volume [%s] error: %v", bind, err)
+				continue
+			}
+			if parsed.Source == "" {
+				// anonymous volume
+				sanitizedBinds = append(sanitizedBinds, bind)
+				continue
+			}
+			if _, ok := vv[parsed.Source]; ok {
+				sanitizedBinds = append(sanitizedBinds, bind)
+			} else {
+				logger.Warnf("[%s] is not a valid volume, will be ignored", bind)
+			}
+		}
+		hostConfig.Binds = sanitizedBinds
+		// sanitize mounts
+		sanitizedMounts := make([]mount.Mount, 0, len(hostConfig.Mounts))
+		for _, mt := range hostConfig.Mounts {
+			if _, ok := vv[mt.Source]; ok {
+				sanitizedMounts = append(sanitizedMounts, mt)
+			} else {
+				logger.Warnf("[%s] is not a valid volume, will be ignored", mt.Source)
+			}
+		}
+		hostConfig.Mounts = sanitizedMounts
+	}
+
+	return config, hostConfig
 }

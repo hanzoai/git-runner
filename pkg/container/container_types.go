@@ -31,6 +31,7 @@ type NewContainerInput struct {
 	AutoRemove bool
 
 	NetworkAliases []string
+	ValidVolumes   []string
 }
 
 // FileEntry is a file to copy to a container
