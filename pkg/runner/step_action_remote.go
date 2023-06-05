@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	gogit "github.com/go-git/go-git/v5"
 
@@ -17,6 +19,8 @@ import (
 	"github.com/nektos/act/pkg/common/git"
 	"github.com/nektos/act/pkg/model"
 )
+
+var detectActionClient = http.Client{Timeout: 5 * time.Second}
 
 type stepActionRemote struct {
 	Step                *model.Step
@@ -57,9 +61,14 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			}
 		}
 
+		cloneURL, err := sar.remoteAction.GetAvailableCloneURL(sar.RunContext.Config.DefaultActionsURLs)
+		if err != nil {
+			return fmt.Errorf("failed to get available clone url of [%s] action, error: %w", sar.Step.Uses, err)
+		}
+
 		actionDir := fmt.Sprintf("%s/%s", sar.RunContext.ActionCacheDir(), safeFilename(sar.Step.Uses))
 		gitClone := stepActionRemoteNewCloneExecutor(git.NewGitCloneExecutorInput{
-			URL:   sar.remoteAction.CloneURL(sar.RunContext.Config.DefaultActionInstance),
+			URL:   cloneURL,
 			Ref:   sar.remoteAction.Ref,
 			Dir:   actionDir,
 			Token: "", /*
@@ -230,6 +239,29 @@ func (ra *remoteAction) IsCheckout() bool {
 		return true
 	}
 	return false
+}
+
+func (ra *remoteAction) GetAvailableCloneURL(actionURLs []string) (string, error) {
+	for _, u := range actionURLs {
+		cloneURL := ra.CloneURL(u)
+		resp, err := detectActionClient.Get(cloneURL)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+
+		switch resp.StatusCode {
+		case http.StatusOK:
+			return cloneURL, nil
+		case http.StatusNotFound:
+			continue
+
+		default:
+			return "", fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
+		}
+	}
+
+	return "", fmt.Errorf("no available url found")
 }
 
 func newRemoteAction(action string) *remoteAction {
