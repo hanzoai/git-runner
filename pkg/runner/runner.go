@@ -36,6 +36,7 @@ type Config struct {
 	Env                                map[string]string          // env for containers
 	Inputs                             map[string]string          // manually passed action inputs
 	Secrets                            map[string]string          // list of secrets
+	Vars                               map[string]string          // list of vars
 	Token                              string                     // GitHub token
 	InsecureSecrets                    bool                       // switch hiding output when printing to terminal
 	Platforms                          map[string]string          // list of platforms
@@ -67,7 +68,6 @@ type Config struct {
 	DefaultActionsURLs    []string                     // urls from gitea's `DEFAULT_ACTIONS_URL` config
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
-	Vars                  map[string]string            // the list of variables set at the repository, environment, or organization levels.
 	ValidVolumes          []string                     // only volumes (and bind mounts) in this slice can be mounted on the job container or service containers
 }
 

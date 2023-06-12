@@ -77,12 +77,11 @@ func (rc *RunContext) NewExpressionEvaluatorWithEnv(ctx context.Context, env map
 		// but required to interpolate/evaluate the step outputs on the job
 		Steps:    rc.getStepsContext(),
 		Secrets:  getWorkflowSecrets(ctx, rc),
+		Vars:     getWorkflowVars(ctx, rc),
 		Strategy: strategy,
 		Matrix:   rc.Matrix,
 		Needs:    using,
 		Inputs:   inputs,
-
-		Vars: rc.getVarsContext(),
 	}
 	if rc.JobContainer != nil {
 		ee.Runner = rc.JobContainer.GetRunnerContext(ctx)
@@ -126,14 +125,13 @@ func (rc *RunContext) NewStepExpressionEvaluator(ctx context.Context, step step)
 		Job:      rc.getJobContext(),
 		Steps:    rc.getStepsContext(),
 		Secrets:  getWorkflowSecrets(ctx, rc),
+		Vars:     getWorkflowVars(ctx, rc),
 		Strategy: strategy,
 		Matrix:   rc.Matrix,
 		Needs:    using,
 		// todo: should be unavailable
 		// but required to interpolate/evaluate the inputs in actions/composite
 		Inputs: inputs,
-
-		Vars: rc.getVarsContext(),
 	}
 	if rc.JobContainer != nil {
 		ee.Runner = rc.JobContainer.GetRunnerContext(ctx)
@@ -425,4 +423,8 @@ func getWorkflowSecrets(ctx context.Context, rc *RunContext) map[string]string {
 	}
 
 	return rc.Config.Secrets
+}
+
+func getWorkflowVars(ctx context.Context, rc *RunContext) map[string]string {
+	return rc.Config.Vars
 }
