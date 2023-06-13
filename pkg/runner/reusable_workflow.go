@@ -17,6 +17,18 @@ import (
 )
 
 func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
+	if !rc.Config.NoSkipCheckout {
+		fullPath := rc.Run.Job().Uses
+
+		fileName := path.Base(fullPath)
+		workflowDir := strings.TrimSuffix(fullPath, path.Join("/", fileName))
+		workflowDir = strings.TrimPrefix(workflowDir, "./")
+
+		return common.NewPipelineExecutor(
+			newReusableWorkflowExecutor(rc, workflowDir, fileName),
+		)
+	}
+
 	// ./.gitea/workflows/wf.yml -> .gitea/workflows/wf.yml
 	trimmedUses := strings.TrimPrefix(rc.Run.Job().Uses, "./")
 	// uses string format is {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}
