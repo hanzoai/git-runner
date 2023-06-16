@@ -49,6 +49,8 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 		}
 
 		github := sar.getGithubContext(ctx)
+		sar.remoteAction.URL = github.ServerURL
+
 		if sar.remoteAction.IsCheckout() && isLocalCheckout(github, sar.Step) && !sar.RunContext.Config.NoSkipCheckout {
 			common.Logger(ctx).Debugf("Skipping local actions/checkout because workdir was already copied")
 			return nil
@@ -56,7 +58,7 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 
 		for _, action := range sar.RunContext.Config.ReplaceGheActionWithGithubCom {
 			if strings.EqualFold(fmt.Sprintf("%s/%s", sar.remoteAction.Org, sar.remoteAction.Repo), action) {
-				sar.remoteAction.URL = "github.com"
+				sar.remoteAction.URL = "https://github.com"
 				github.Token = sar.RunContext.Config.ReplaceGheActionTokenWithGithubCom
 			}
 		}

@@ -368,7 +368,11 @@ func (e *HostEnvironment) ToContainerPath(path string) string {
 }
 
 func (e *HostEnvironment) GetActPath() string {
-	return e.ActPath
+	actPath := e.ActPath
+	if runtime.GOOS == "windows" {
+		actPath = strings.ReplaceAll(actPath, "\\", "/")
+	}
+	return actPath
 }
 
 func (*HostEnvironment) GetPathVariableName() string {
@@ -389,11 +393,13 @@ func (*HostEnvironment) JoinPathVariable(paths ...string) string {
 	return strings.Join(paths, string(filepath.ListSeparator))
 }
 
+// Reference for Arch values for runner.arch
+// https://docs.github.com/en/actions/learn-github-actions/contexts#runner-context
 func goArchToActionArch(arch string) string {
 	archMapper := map[string]string{
 		"x86_64":  "X64",
-		"386":     "x86",
-		"aarch64": "arm64",
+		"386":     "X86",
+		"aarch64": "ARM64",
 	}
 	if arch, ok := archMapper[arch]; ok {
 		return arch
