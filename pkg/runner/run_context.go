@@ -832,6 +832,15 @@ func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext
 			ghc.Token = preset.Token
 			ghc.RepositoryOwner = preset.RepositoryOwner
 			ghc.RetentionDays = preset.RetentionDays
+
+			instance := rc.Config.GitHubInstance
+			if !strings.HasPrefix(instance, "http://") &&
+				!strings.HasPrefix(instance, "https://") {
+				instance = "https://" + instance
+			}
+			ghc.ServerURL = instance
+			ghc.APIURL = instance + "/api/v1" // the version of Gitea is v1
+			ghc.GraphQLURL = ""               // Gitea doesn't support graphql
 			return ghc
 		}
 	}

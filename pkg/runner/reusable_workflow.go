@@ -34,11 +34,10 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	// uses string format is {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}
 	uses := fmt.Sprintf("%s/%s@%s", rc.Config.PresetGitHubContext.Repository, trimmedUses, rc.Config.PresetGitHubContext.Sha)
 
-	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(uses)
+	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
 	}
-	remoteReusableWorkflow.URL = rc.Config.GitHubInstance
 
 	workflowDir := fmt.Sprintf("%s/%s", rc.ActionCacheDir(), safeFilename(uses))
 
@@ -54,7 +53,7 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	uses := rc.Run.Job().Uses
 
-	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(uses)
+	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
 	}
@@ -95,8 +94,10 @@ func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkfl
 			return notExists
 		},
 		func(ctx context.Context) error {
-			// Gitea has already full URL with rc.Config.GitHubInstance
-			//remoteReusableWorkflow.URL = rc.getGithubContext(ctx).ServerURL
+			// Do not change the remoteReusableWorkflow.URL, because:
+			// 	1. Gitea doesn't support specifying GithubContext.ServerURL by the GITHUB_SERVER_URL env
+			//	2. Gitea has already full URL with rc.Config.GitHubInstance when calling newRemoteReusableWorkflowWithPlat
+			// remoteReusableWorkflow.URL = rc.getGithubContext(ctx).ServerURL
 			return git.NewGitCloneExecutor(git.NewGitCloneExecutorInput{
 				URL:   remoteReusableWorkflow.CloneURL(),
 				Ref:   remoteReusableWorkflow.Ref,
@@ -163,7 +164,10 @@ func (r *remoteReusableWorkflow) FilePath() string {
 	return fmt.Sprintf("./.%s/workflows/%s", r.GitPlatform, r.Filename)
 }
 
-func newRemoteReusableWorkflowWithPlat(uses string) *remoteReusableWorkflow {
+// For Gitea
+// newRemoteReusableWorkflowWithPlat create a `remoteReusableWorkflow`
+// workflows from `.gitea/workflows` and `.github/workflows` are supported
+func newRemoteReusableWorkflowWithPlat(url, uses string) *remoteReusableWorkflow {
 	// GitHub docs:
 	// https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_iduses
 	r := regexp.MustCompile(`^([^/]+)/([^/]+)/\.([^/]+)/workflows/([^@]+)@(.*)$`)
@@ -177,6 +181,7 @@ func newRemoteReusableWorkflowWithPlat(uses string) *remoteReusableWorkflow {
 		GitPlatform: matches[3],
 		Filename:    matches[4],
 		Ref:         matches[5],
+		URL:         url,
 	}
 }
 
