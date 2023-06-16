@@ -18,6 +18,7 @@ import (
 
 	"github.com/docker/docker/api/types/network"
 	networktypes "github.com/docker/docker/api/types/network"
+	"github.com/gobwas/glob"
 
 	"github.com/go-git/go-billy/v5/helper/polyfill"
 	"github.com/go-git/go-billy/v5/osfs"
@@ -883,13 +884,27 @@ func (cr *containerReference) wait() common.Executor {
 	}
 }
 
+// For Gitea
+// sanitizeConfig remove the invalid configurations from `config` and `hostConfig`
 func (cr *containerReference) sanitizeConfig(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig) {
 	logger := common.Logger(ctx)
 
 	if len(cr.input.ValidVolumes) > 0 {
-		vv := make(map[string]struct{}, len(cr.input.ValidVolumes))
-		for _, volume := range cr.input.ValidVolumes {
-			vv[volume] = struct{}{}
+		globs := make([]glob.Glob, 0, len(cr.input.ValidVolumes))
+		for _, v := range cr.input.ValidVolumes {
+			if g, err := glob.Compile(v); err != nil {
+				logger.Errorf("create glob from %s error: %v", v, err)
+			} else {
+				globs = append(globs, g)
+			}
+		}
+		isValid := func(v string) bool {
+			for _, g := range globs {
+				if g.Match(v) {
+					return true
+				}
+			}
+			return false
 		}
 		// sanitize binds
 		sanitizedBinds := make([]string, 0, len(hostConfig.Binds))
@@ -904,23 +919,26 @@ func (cr *containerReference) sanitizeConfig(ctx context.Context, config *contai
 				sanitizedBinds = append(sanitizedBinds, bind)
 				continue
 			}
-			if _, ok := vv[parsed.Source]; ok {
+			if isValid(parsed.Source) {
 				sanitizedBinds = append(sanitizedBinds, bind)
 			} else {
-				logger.Warnf("[%s] is not a valid volume, will be ignored", bind)
+				logger.Warnf("[%s] is not a valid volume, will be ignored", parsed.Source)
 			}
 		}
 		hostConfig.Binds = sanitizedBinds
 		// sanitize mounts
 		sanitizedMounts := make([]mount.Mount, 0, len(hostConfig.Mounts))
 		for _, mt := range hostConfig.Mounts {
-			if _, ok := vv[mt.Source]; ok {
+			if isValid(mt.Source) {
 				sanitizedMounts = append(sanitizedMounts, mt)
 			} else {
 				logger.Warnf("[%s] is not a valid volume, will be ignored", mt.Source)
 			}
 		}
 		hostConfig.Mounts = sanitizedMounts
+	} else {
+		hostConfig.Binds = []string{}
+		hostConfig.Mounts = []mount.Mount{}
 	}
 
 	return config, hostConfig

@@ -9,8 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nektos/act/pkg/common"
+
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -166,3 +170,76 @@ func TestDockerExecFailure(t *testing.T) {
 
 // Type assert containerReference implements ExecutionsEnvironment
 var _ ExecutionsEnvironment = &containerReference{}
+
+func TestCheckVolumes(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		validVolumes  []string
+		binds         []string
+		expectedBinds []string
+	}{
+		{
+			desc:         "match all volumes",
+			validVolumes: []string{"**"},
+			binds: []string{
+				"shared_volume:/shared_volume",
+				"/home/test/data:/test_data",
+				"/etc/conf.d/base.json:/config/base.json",
+				"sql_data:/sql_data",
+				"/secrets/keys:/keys",
+			},
+			expectedBinds: []string{
+				"shared_volume:/shared_volume",
+				"/home/test/data:/test_data",
+				"/etc/conf.d/base.json:/config/base.json",
+				"sql_data:/sql_data",
+				"/secrets/keys:/keys",
+			},
+		},
+		{
+			desc:         "no volumes can be matched",
+			validVolumes: []string{},
+			binds: []string{
+				"shared_volume:/shared_volume",
+				"/home/test/data:/test_data",
+				"/etc/conf.d/base.json:/config/base.json",
+				"sql_data:/sql_data",
+				"/secrets/keys:/keys",
+			},
+			expectedBinds: []string{},
+		},
+		{
+			desc: "only allowed volumes can be matched",
+			validVolumes: []string{
+				"shared_volume",
+				"/home/test/data",
+				"/etc/conf.d/*.json",
+			},
+			binds: []string{
+				"shared_volume:/shared_volume",
+				"/home/test/data:/test_data",
+				"/etc/conf.d/base.json:/config/base.json",
+				"sql_data:/sql_data",
+				"/secrets/keys:/keys",
+			},
+			expectedBinds: []string{
+				"shared_volume:/shared_volume",
+				"/home/test/data:/test_data",
+				"/etc/conf.d/base.json:/config/base.json",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			logger, _ := test.NewNullLogger()
+			ctx := common.WithLogger(context.Background(), logger)
+			cr := &containerReference{
+				input: &NewContainerInput{
+					ValidVolumes: tc.validVolumes,
+				},
+			}
+			_, hostConf := cr.sanitizeConfig(ctx, &container.Config{}, &container.HostConfig{Binds: tc.binds})
+			assert.Equal(t, tc.expectedBinds, hostConf.Binds)
+		})
+	}
+}
