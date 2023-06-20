@@ -49,8 +49,6 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 		}
 
 		github := sar.getGithubContext(ctx)
-		sar.remoteAction.URL = github.ServerURL
-
 		if sar.remoteAction.IsCheckout() && isLocalCheckout(github, sar.Step) && !sar.RunContext.Config.NoSkipCheckout {
 			common.Logger(ctx).Debugf("Skipping local actions/checkout because workdir was already copied")
 			return nil
@@ -225,11 +223,7 @@ type remoteAction struct {
 	Ref  string
 }
 
-func (ra *remoteAction) CloneURL(defaultURL string) string {
-	u := ra.URL
-	if u == "" {
-		u = defaultURL
-	}
+func (ra *remoteAction) CloneURL(u string) string {
 	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		u = "https://" + u
 	}
@@ -244,6 +238,9 @@ func (ra *remoteAction) IsCheckout() bool {
 }
 
 func (ra *remoteAction) GetAvailableCloneURL(actionURLs []string) (string, error) {
+	if ra.URL != "" {
+		return ra.CloneURL(ra.URL), nil
+	}
 	for _, u := range actionURLs {
 		cloneURL := ra.CloneURL(u)
 		resp, err := detectActionClient.Get(cloneURL)

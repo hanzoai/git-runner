@@ -874,6 +874,18 @@ func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext
 		ghc.APIURL = fmt.Sprintf("https://%s/api/v3", rc.Config.GitHubInstance)
 		ghc.GraphQLURL = fmt.Sprintf("https://%s/api/graphql", rc.Config.GitHubInstance)
 	}
+
+	{ // Adapt to Gitea
+		instance := rc.Config.GitHubInstance
+		if !strings.HasPrefix(instance, "http://") &&
+			!strings.HasPrefix(instance, "https://") {
+			instance = "https://" + instance
+		}
+		ghc.ServerURL = instance
+		ghc.APIURL = instance + "/api/v1" // the version of Gitea is v1
+		ghc.GraphQLURL = ""               // Gitea doesn't support graphql
+	}
+
 	// allow to be overridden by user
 	if rc.Config.Env["GITHUB_SERVER_URL"] != "" {
 		ghc.ServerURL = rc.Config.Env["GITHUB_SERVER_URL"]
