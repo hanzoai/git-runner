@@ -65,8 +65,7 @@ type Config struct {
 	ContainerNamePrefix   string                       // the prefix of container name
 	ContainerMaxLifetime  time.Duration                // the max lifetime of job containers
 	ContainerNetworkMode  docker_container.NetworkMode // the network mode of job containers (the value of --network)
-	DefaultActionInstance string                       // Deprecated: use DefaultActionsURLs instead.
-	DefaultActionsURLs    []string                     // urls from gitea's `DEFAULT_ACTIONS_URL` config
+	DefaultActionInstance string                       // the default actions web site
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
 	ValidVolumes          []string                     // only volumes (and bind mounts) in this slice can be mounted on the job container or service containers
