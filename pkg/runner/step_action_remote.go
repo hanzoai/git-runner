@@ -39,6 +39,12 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			return nil
 		}
 
+		// For gitea:
+		// Since actions can specify the download source via a url prefix.
+		// The prefix may contain some sensitive information that needs to be stored in secrets,
+		// so we need to interpolate the expression value for uses first.
+		sar.Step.Uses = sar.RunContext.NewExpressionEvaluator(ctx).Interpolate(ctx, sar.Step.Uses)
+
 		sar.remoteAction = newRemoteAction(sar.Step.Uses)
 		if sar.remoteAction == nil {
 			return fmt.Errorf("Expected format {org}/{repo}[/path]@ref. Actual '%s' Input string was not in a correct format", sar.Step.Uses)
