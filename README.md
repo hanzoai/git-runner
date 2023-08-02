@@ -217,7 +217,7 @@ If your workflow depends on this token, you need to create a [personal access to
 act -s GITHUB_TOKEN=[insert token or leave blank and omit equals for secure input]
 ```
 
-If [GitHub CLI](https://cli.github.com/) is installed, the [`gh auth token`](https://cli.github.com/manual/gh_auth_token) command can be used to autmatically pass the token to act
+If [GitHub CLI](https://cli.github.com/) is installed, the [`gh auth token`](https://cli.github.com/manual/gh_auth_token) command can be used to automatically pass the token to act
 
 ```bash
 act -s GITHUB_TOKEN="$(gh auth token)"
@@ -296,6 +296,15 @@ If you need an environment that works just like the corresponding GitHub runner 
 :warning: :elephant: `*** WARNING - this image is >18GB 😱***`
 
 - [`catthehacker/ubuntu:full-*`](https://github.com/catthehacker/docker_images/pkgs/container/ubuntu) - built from Packer template provided by GitHub, see [catthehacker/virtual-environments-fork](https://github.com/catthehacker/virtual-environments-fork) or [catthehacker/docker_images](https://github.com/catthehacker/docker_images) for more information
+
+## Using local runner images
+
+The `--pull` flag is set to true by default due to a breaking on older default docker images. This would pull the docker image everytime act is executed.
+
+Set `--pull` to false if a local docker image is needed
+```sh
+  act --pull=false
+```
 
 ## Use an alternative runner image
 
@@ -485,7 +494,7 @@ Want to contribute to act? Awesome! Check out the [contributing guidelines](CONT
 
 ## Manually building from source
 
-- Install Go tools 1.18+ - (<https://golang.org/doc/install>)
+- Install Go tools 1.20+ - (<https://golang.org/doc/install>)
 - Clone this repo `git clone git@github.com:nektos/act.git`
 - Run unit tests with `make test`
 - Build and install: `make install`

@@ -571,16 +571,19 @@ func (rc *RunContext) steps() []*model.Step {
 }
 
 // Executor returns a pipeline executor for all the steps in the job
-func (rc *RunContext) Executor() common.Executor {
+func (rc *RunContext) Executor() (common.Executor, error) {
 	var executor common.Executor
+	var jobType, err = rc.Run.Job().Type()
 
-	switch rc.Run.Job().Type() {
+	switch jobType {
 	case model.JobTypeDefault:
 		executor = newJobExecutor(rc, &stepFactoryImpl{}, rc)
 	case model.JobTypeReusableWorkflowLocal:
 		executor = newLocalReusableWorkflowExecutor(rc)
 	case model.JobTypeReusableWorkflowRemote:
 		executor = newRemoteReusableWorkflowExecutor(rc)
+	case model.JobTypeInvalid:
+		return nil, err
 	}
 
 	return func(ctx context.Context) error {
@@ -592,7 +595,7 @@ func (rc *RunContext) Executor() common.Executor {
 			return executor(ctx)
 		}
 		return nil
-	}
+	}, nil
 }
 
 func (rc *RunContext) containerImage(ctx context.Context) string {
@@ -642,7 +645,7 @@ func (rc *RunContext) platformImage(ctx context.Context) string {
 	return rc.runsOnImage(ctx)
 }
 
-func (rc *RunContext) options(ctx context.Context) string {
+func (rc *RunContext) options(_ context.Context) string {
 	job := rc.Run.Job()
 	c := job.Container()
 	if c == nil {
@@ -655,17 +658,22 @@ func (rc *RunContext) options(ctx context.Context) string {
 func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {
 	job := rc.Run.Job()
 	l := common.Logger(ctx)
-	runJob, err := EvalBool(ctx, rc.ExprEval, job.If.Value, exprparser.DefaultStatusCheckSuccess)
-	if err != nil {
-		return false, fmt.Errorf("  \u274C  Error in if-expression: \"if: %s\" (%s)", job.If.Value, err)
+	runJob, runJobErr := EvalBool(ctx, rc.ExprEval, job.If.Value, exprparser.DefaultStatusCheckSuccess)
+	jobType, jobTypeErr := job.Type()
+
+	if runJobErr != nil {
+		return false, fmt.Errorf("  \u274C  Error in if-expression: \"if: %s\" (%s)", job.If.Value, runJobErr)
 	}
+
+	if jobType == model.JobTypeInvalid {
+		return false, jobTypeErr
+	} else if jobType != model.JobTypeDefault {
+		return true, nil
+	}
+
 	if !runJob {
 		l.WithField("jobResult", "skipped").Debugf("Skipping job '%s' due to '%s'", job.Name, job.If.Value)
 		return false, nil
-	}
-
-	if job.Type() != model.JobTypeDefault {
-		return true, nil
 	}
 
 	img := rc.platformImage(ctx)
@@ -1010,37 +1018,37 @@ func setActionRuntimeVars(rc *RunContext, env map[string]string) {
 	env["ACTIONS_RUNTIME_TOKEN"] = actionsRuntimeToken
 }
 
-func (rc *RunContext) handleCredentials(ctx context.Context) (username, password string, err error) {
+func (rc *RunContext) handleCredentials(ctx context.Context) (string, string, error) {
 	// TODO: remove below 2 lines when we can release act with breaking changes
-	username = rc.Config.Secrets["DOCKER_USERNAME"]
-	password = rc.Config.Secrets["DOCKER_PASSWORD"]
+	username := rc.Config.Secrets["DOCKER_USERNAME"]
+	password := rc.Config.Secrets["DOCKER_PASSWORD"]
 
 	container := rc.Run.Job().Container()
 	if container == nil || container.Credentials == nil {
-		return
+		return username, password, nil
 	}
 
 	if container.Credentials != nil && len(container.Credentials) != 2 {
-		err = fmt.Errorf("invalid property count for key 'credentials:'")
-		return
+		err := fmt.Errorf("invalid property count for key 'credentials:'")
+		return "", "", err
 	}
 
 	ee := rc.NewExpressionEvaluator(ctx)
 	if username = ee.Interpolate(ctx, container.Credentials["username"]); username == "" {
-		err = fmt.Errorf("failed to interpolate container.credentials.username")
-		return
+		err := fmt.Errorf("failed to interpolate container.credentials.username")
+		return "", "", err
 	}
 	if password = ee.Interpolate(ctx, container.Credentials["password"]); password == "" {
-		err = fmt.Errorf("failed to interpolate container.credentials.password")
-		return
+		err := fmt.Errorf("failed to interpolate container.credentials.password")
+		return "", "", err
 	}
 
 	if container.Credentials["username"] == "" || container.Credentials["password"] == "" {
-		err = fmt.Errorf("container.credentials cannot be empty")
-		return
+		err := fmt.Errorf("container.credentials cannot be empty")
+		return "", "", err
 	}
 
-	return username, password, err
+	return username, password, nil
 }
 
 func (rc *RunContext) handleServiceCredentials(ctx context.Context, creds map[string]string) (username, password string, err error) {

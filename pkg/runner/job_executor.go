@@ -148,7 +148,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 	pipeline = append(pipeline, steps...)
 
 	return common.NewPipelineExecutor(info.startContainer(), common.NewPipelineExecutor(pipeline...).
-		Finally(func(ctx context.Context) error {
+		Finally(func(ctx context.Context) error { //nolint:contextcheck
 			var cancel context.CancelFunc
 			if ctx.Err() == context.Canceled {
 				// in case of an aborted run, we still should execute the
