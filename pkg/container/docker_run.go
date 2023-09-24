@@ -385,7 +385,7 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 		copts.privileged = false
 	}
 
-	containerConfig, err := parse(flags, copts, "")
+	containerConfig, err := parse(flags, copts, runtime.GOOS)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot process container options: '%s': '%w'", input.Options, err)
 	}
@@ -704,6 +704,14 @@ func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal boo
 
 		return nil
 	}
+}
+
+func (cr *containerReference) CopyTarStream(ctx context.Context, destPath string, tarStream io.Reader) error {
+	err := cr.cli.CopyToContainer(ctx, cr.id, destPath, tarStream, types.CopyToContainerOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to copy content to container: %w", err)
+	}
+	return nil
 }
 
 func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgnore bool) common.Executor {
