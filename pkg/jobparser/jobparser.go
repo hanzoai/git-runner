@@ -53,7 +53,7 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 			}
 			job.Name = nameWithMatrix(job.Name, matrix)
 			job.Strategy.RawMatrix = encodeMatrix(matrix)
-			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results))
+			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars))
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {
 				runsOn[i] = evaluator.Interpolate(v)
@@ -86,9 +86,16 @@ func WithGitContext(context *model.GithubContext) ParseOption {
 	}
 }
 
+func WithVars(vars map[string]string) ParseOption {
+	return func(c *parseContext) {
+		c.vars = vars
+	}
+}
+
 type parseContext struct {
 	jobResults map[string]string
 	gitContext *model.GithubContext
+	vars       map[string]string
 }
 
 type ParseOption func(c *parseContext)
