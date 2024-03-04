@@ -649,7 +649,7 @@ func (rc *RunContext) options(ctx context.Context) string {
 	job := rc.Run.Job()
 	c := job.Container()
 	if c != nil {
-		return rc.ExprEval.Interpolate(ctx, c.Options)
+		return rc.Config.ContainerOptions + " " + rc.ExprEval.Interpolate(ctx, c.Options)
 	}
 
 	return rc.Config.ContainerOptions
