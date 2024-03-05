@@ -75,6 +75,8 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 				For GitHub, they are the same, always github.com.
 				But for Gitea, tasks triggered by a.com can clone actions from b.com.
 			*/
+
+			InsecureSkipTLS: sar.cloneSkipTLS(), // For Gitea
 		})
 		var ntErr common.Executor
 		if err := gitClone(ctx); err != nil {
@@ -210,6 +212,22 @@ func (sar *stepActionRemote) getCompositeRunContext(ctx context.Context) *RunCon
 
 func (sar *stepActionRemote) getCompositeSteps() *compositeSteps {
 	return sar.compositeSteps
+}
+
+// For Gitea
+// cloneSkipTLS returns true if the runner can clone an action from the Gitea instance
+func (sar *stepActionRemote) cloneSkipTLS() bool {
+	if !sar.RunContext.Config.InsecureSkipTLS {
+		// Return false if the Gitea instance is not an insecure instance
+		return false
+	}
+	if sar.remoteAction.URL == "" {
+		// Empty URL means the default action instance should be used
+		// Return true if the URL of the Gitea instance is the same as the URL of the default action instance
+		return sar.RunContext.Config.DefaultActionInstance == sar.RunContext.Config.GitHubInstance
+	}
+	// Return true if the URL of the remote action is the same as the URL of the Gitea instance
+	return sar.remoteAction.URL == sar.RunContext.Config.GitHubInstance
 }
 
 type remoteAction struct {

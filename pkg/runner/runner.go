@@ -70,6 +70,7 @@ type Config struct {
 	PlatformPicker        func(labels []string) string // platform picker, it will take precedence over Platforms if isn't nil
 	JobLoggerLevel        *log.Level                   // the level of job logger
 	ValidVolumes          []string                     // only volumes (and bind mounts) in this slice can be mounted on the job container or service containers
+	InsecureSkipTLS       bool                         // whether to skip verifying TLS certificate of the Gitea instance
 }
 
 // GetToken: Adapt to Gitea

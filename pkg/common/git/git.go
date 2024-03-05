@@ -225,6 +225,9 @@ type NewGitCloneExecutorInput struct {
 	Ref   string
 	Dir   string
 	Token string
+
+	// For Gitea
+	InsecureSkipTLS bool
 }
 
 // CloneIfRequired ...
@@ -246,6 +249,8 @@ func CloneIfRequired(ctx context.Context, refName plumbing.ReferenceName, input 
 		cloneOptions := git.CloneOptions{
 			URL:      input.URL,
 			Progress: progressWriter,
+
+			InsecureSkipTLS: input.InsecureSkipTLS, // For Gitea
 		}
 		if input.Token != "" {
 			cloneOptions.Auth = &http.BasicAuth{
@@ -304,6 +309,11 @@ func NewGitCloneExecutor(input NewGitCloneExecutorInput) common.Executor {
 
 		// fetch latest changes
 		fetchOptions, pullOptions := gitOptions(input.Token)
+
+		if input.InsecureSkipTLS { // For Gitea
+			fetchOptions.InsecureSkipTLS = true
+			pullOptions.InsecureSkipTLS = true
+		}
 
 		err = r.Fetch(&fetchOptions)
 		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
