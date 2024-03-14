@@ -9,6 +9,7 @@ import (
 )
 
 var commandPatternGA *regexp.Regexp
+
 var commandPatternADO *regexp.Regexp
 
 func init() {
@@ -41,7 +42,9 @@ func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
 		}
 
 		if resumeCommand != "" && command != resumeCommand {
-			logger.Infof("  \U00002699  %s", line)
+			// There should not be any emojis in the log output for Gitea.
+			// The code in the switch statement is the same.
+			logger.Infof("%s", line)
 			return false
 		}
 		arg = unescapeCommandData(arg)
@@ -54,27 +57,27 @@ func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
 		case "add-path":
 			rc.addPath(ctx, arg)
 		case "debug":
-			logger.Infof("  \U0001F4AC  %s", line)
+			logger.Infof("%s", line)
 		case "warning":
-			logger.Infof("  \U0001F6A7  %s", line)
+			logger.Infof("%s", line)
 		case "error":
-			logger.Infof("  \U00002757  %s", line)
+			logger.Infof("%s", line)
 		case "add-mask":
 			rc.AddMask(arg)
-			logger.Infof("  \U00002699  %s", "***")
+			logger.Infof("%s", "***")
 		case "stop-commands":
 			resumeCommand = arg
-			logger.Infof("  \U00002699  %s", line)
+			logger.Infof("%s", line)
 		case resumeCommand:
 			resumeCommand = ""
-			logger.Infof("  \U00002699  %s", line)
+			logger.Infof("%s", line)
 		case "save-state":
-			logger.Infof("  \U0001f4be  %s", line)
+			logger.Infof("%s", line)
 			rc.saveState(ctx, kvPairs, arg)
 		case "add-matcher":
-			logger.Infof("  \U00002753 add-matcher %s", arg)
+			logger.Infof("%s", line)
 		default:
-			logger.Infof("  \U00002753  %s", line)
+			logger.Infof("%s", line)
 		}
 
 		// return true to let gitea's logger handle these special outputs also
@@ -84,7 +87,7 @@ func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
 
 func (rc *RunContext) setEnv(ctx context.Context, kvPairs map[string]string, arg string) {
 	name := kvPairs["name"]
-	common.Logger(ctx).Infof("  \U00002699  ::set-env:: %s=%s", name, arg)
+	common.Logger(ctx).Infof("::set-env:: %s=%s", name, arg)
 	if rc.Env == nil {
 		rc.Env = make(map[string]string)
 	}
@@ -101,6 +104,7 @@ func (rc *RunContext) setEnv(ctx context.Context, kvPairs map[string]string, arg
 	mergeIntoMap(rc.Env, newenv)
 	mergeIntoMap(rc.GlobalEnv, newenv)
 }
+
 func (rc *RunContext) setOutput(ctx context.Context, kvPairs map[string]string, arg string) {
 	logger := common.Logger(ctx)
 	stepID := rc.CurrentStep
@@ -116,11 +120,12 @@ func (rc *RunContext) setOutput(ctx context.Context, kvPairs map[string]string, 
 		return
 	}
 
-	logger.Infof("  \U00002699  ::set-output:: %s=%s", outputName, arg)
+	logger.Infof("::set-output:: %s=%s", outputName, arg)
 	result.Outputs[outputName] = arg
 }
+
 func (rc *RunContext) addPath(ctx context.Context, arg string) {
-	common.Logger(ctx).Infof("  \U00002699  ::add-path:: %s", arg)
+	common.Logger(ctx).Infof("::add-path:: %s", arg)
 	extraPath := []string{arg}
 	for _, v := range rc.ExtraPath {
 		if v != arg {
@@ -141,6 +146,7 @@ func parseKeyValuePairs(kvPairs string, separator string) map[string]string {
 	}
 	return rtn
 }
+
 func unescapeCommandData(arg string) string {
 	escapeMap := map[string]string{
 		"%25": "%",
@@ -152,6 +158,7 @@ func unescapeCommandData(arg string) string {
 	}
 	return arg
 }
+
 func unescapeCommandProperty(arg string) string {
 	escapeMap := map[string]string{
 		"%25": "%",
@@ -165,6 +172,7 @@ func unescapeCommandProperty(arg string) string {
 	}
 	return arg
 }
+
 func unescapeKvPairs(kvPairs map[string]string) map[string]string {
 	for k, v := range kvPairs {
 		kvPairs[k] = unescapeCommandProperty(v)
