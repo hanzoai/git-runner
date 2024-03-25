@@ -1,4 +1,4 @@
-//go:build !(WITHOUT_DOCKER || !(linux || darwin || windows))
+//go:build !(WITHOUT_DOCKER || !(linux || darwin || windows || netbsd))
 
 package container
 
@@ -38,6 +38,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/filecollector"
 )
 
 // NewContainer creates a reference to a container
@@ -86,7 +87,7 @@ func supportsContainerImagePlatform(ctx context.Context, cli client.APIClient) b
 
 func (cr *containerReference) Create(capAdd []string, capDrop []string) common.Executor {
 	return common.
-		NewInfoExecutor("%sdocker create image=%s platform=%s entrypoint=%+q cmd=%+q", logPrefix, cr.input.Image, cr.input.Platform, cr.input.Entrypoint, cr.input.Cmd).
+		NewInfoExecutor("%sdocker create image=%s platform=%s entrypoint=%+q cmd=%+q network=%+q", logPrefix, cr.input.Image, cr.input.Platform, cr.input.Entrypoint, cr.input.Cmd, cr.input.NetworkMode).
 		Then(
 			common.NewPipelineExecutor(
 				cr.connect(),
@@ -98,7 +99,7 @@ func (cr *containerReference) Create(capAdd []string, capDrop []string) common.E
 
 func (cr *containerReference) Start(attach bool) common.Executor {
 	return common.
-		NewInfoExecutor("%sdocker run image=%s platform=%s entrypoint=%+q cmd=%+q", logPrefix, cr.input.Image, cr.input.Platform, cr.input.Entrypoint, cr.input.Cmd).
+		NewInfoExecutor("%sdocker run image=%s platform=%s entrypoint=%+q cmd=%+q network=%+q", logPrefix, cr.input.Image, cr.input.Platform, cr.input.Entrypoint, cr.input.Cmd, cr.input.NetworkMode).
 		Then(
 			common.NewPipelineExecutor(
 				cr.connect(),
@@ -260,8 +261,10 @@ func RunnerArch(ctx context.Context) string {
 
 	archMapper := map[string]string{
 		"x86_64":  "X64",
+		"amd64":   "X64",
 		"386":     "X86",
 		"aarch64": "ARM64",
+		"arm64":   "ARM64",
 	}
 	if arch, ok := archMapper[info.Architecture]; ok {
 		return arch
@@ -365,15 +368,25 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 		return nil, nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", input.Options, err)
 	}
 
-	// If a service container's network is set to `host`, the container will not be able to
-	// connect to the specified network created for the job container and the service containers.
-	// So comment out the following code.
-
+	// FIXME: If everything is fine after gitea/act v0.260.0, remove the following comment.
+	// In the old fork version, the code is
 	// if len(copts.netMode.Value()) == 0 {
 	// 	if err = copts.netMode.Set("host"); err != nil {
 	// 		return nil, nil, fmt.Errorf("Cannot parse networkmode=host. This is an internal error and should not happen: '%w'", err)
 	// 	}
 	// }
+	// And it has been commented with:
+	//   If a service container's network is set to `host`, the container will not be able to
+	//   connect to the specified network created for the job container and the service containers.
+	//   So comment out the following code.
+	// Not the if it's necessary to comment it in the new version,
+	// since it's cr.input.NetworkMode now.
+
+	if len(copts.netMode.Value()) == 0 {
+		if err = copts.netMode.Set(cr.input.NetworkMode); err != nil {
+			return nil, nil, fmt.Errorf("Cannot parse networkmode=%s. This is an internal error and should not happen: '%w'", cr.input.NetworkMode, err)
+		}
+	}
 
 	// If the `privileged` config has been disabled, `copts.privileged` need to be forced to false,
 	// even if the user specifies `--privileged` in the options string.
@@ -426,10 +439,11 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		input := cr.input
 
 		config := &container.Config{
-			Image:      input.Image,
-			WorkingDir: input.WorkingDir,
-			Env:        input.Env,
-			Tty:        isTerminal,
+			Image:        input.Image,
+			WorkingDir:   input.WorkingDir,
+			Env:          input.Env,
+			ExposedPorts: input.ExposedPorts,
+			Tty:          isTerminal,
 		}
 		logger.Debugf("Common container.Config ==> %+v", config)
 
@@ -465,14 +479,15 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		}
 
 		hostConfig := &container.HostConfig{
-			CapAdd:      capAdd,
-			CapDrop:     capDrop,
-			Binds:       input.Binds,
-			Mounts:      mounts,
-			NetworkMode: container.NetworkMode(input.NetworkMode),
-			Privileged:  input.Privileged,
-			UsernsMode:  container.UsernsMode(input.UsernsMode),
-			AutoRemove:  input.AutoRemove,
+			CapAdd:       capAdd,
+			CapDrop:      capDrop,
+			Binds:        input.Binds,
+			Mounts:       mounts,
+			NetworkMode:  container.NetworkMode(input.NetworkMode),
+			Privileged:   input.Privileged,
+			UsernsMode:   container.UsernsMode(input.UsernsMode),
+			PortBindings: input.PortBindings,
+			AutoRemove:   input.AutoRemove,
 		}
 		logger.Debugf("Common container.HostConfig ==> %+v", hostConfig)
 
@@ -484,10 +499,11 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		// For Gitea
 		config, hostConfig = cr.sanitizeConfig(ctx, config, hostConfig)
 
-		// For Gitea
-		// network-scoped alias is supported only for containers in user defined networks
 		var networkingConfig *network.NetworkingConfig
-		if hostConfig.NetworkMode.IsUserDefined() && len(input.NetworkAliases) > 0 {
+		logger.Debugf("input.NetworkAliases ==> %v", input.NetworkAliases)
+		n := hostConfig.NetworkMode
+		// IsUserDefined and IsHost are broken on windows
+		if n.IsUserDefined() && n != "host" && len(input.NetworkAliases) > 0 {
 			endpointConfig := &network.EndpointSettings{
 				Aliases: input.NetworkAliases,
 			}
@@ -709,9 +725,27 @@ func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal boo
 }
 
 func (cr *containerReference) CopyTarStream(ctx context.Context, destPath string, tarStream io.Reader) error {
-	err := cr.cli.CopyToContainer(ctx, cr.id, destPath, tarStream, types.CopyToContainerOptions{})
+	// Mkdir
+	buf := &bytes.Buffer{}
+	tw := tar.NewWriter(buf)
+	_ = tw.WriteHeader(&tar.Header{
+		Name:     destPath,
+		Mode:     777,
+		Typeflag: tar.TypeDir,
+	})
+	tw.Close()
+	err := cr.cli.CopyToContainer(ctx, cr.id, "/", buf, types.CopyToContainerOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to mkdir to copy content to container: %w", err)
+	}
+	// Copy Content
+	err = cr.cli.CopyToContainer(ctx, cr.id, destPath, tarStream, types.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy content to container: %w", err)
+	}
+	// If this fails, then folders have wrong permissions on non root container
+	if cr.UID != 0 || cr.GID != 0 {
+		_ = cr.Exec([]string{"chown", "-R", fmt.Sprintf("%d:%d", cr.UID, cr.GID), destPath}, nil, "0", "")(ctx)
 	}
 	return nil
 }
@@ -753,12 +787,12 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 			ignorer = gitignore.NewMatcher(ps)
 		}
 
-		fc := &fileCollector{
-			Fs:        &defaultFs{},
+		fc := &filecollector.FileCollector{
+			Fs:        &filecollector.DefaultFs{},
 			Ignorer:   ignorer,
 			SrcPath:   srcPath,
 			SrcPrefix: srcPrefix,
-			Handler: &tarCollector{
+			Handler: &filecollector.TarCollector{
 				TarWriter: tw,
 				UID:       cr.UID,
 				GID:       cr.GID,
@@ -766,7 +800,7 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 			},
 		}
 
-		err = filepath.Walk(srcPath, fc.collectFiles(ctx, []string{}))
+		err = filepath.Walk(srcPath, fc.CollectFiles(ctx, []string{}))
 		if err != nil {
 			return err
 		}

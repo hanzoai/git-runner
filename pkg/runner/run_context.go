@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/opencontainers/selinux/go-selinux"
 
 	"github.com/nektos/act/pkg/common"
@@ -65,7 +66,7 @@ func (rc *RunContext) String() string {
 	if rc.caller != nil {
 		// prefix the reusable workflow with the caller job
 		// this is required to create unique container names
-		name = fmt.Sprintf("%s/%s", rc.caller.runContext.Run.JobID, name)
+		name = fmt.Sprintf("%s/%s", rc.caller.runContext.Name, name)
 	}
 	return name
 }
@@ -95,9 +96,15 @@ func (rc *RunContext) jobContainerName() string {
 }
 
 // networkName return the name of the network which will be created by `act` automatically for job,
-// only create network if `rc.Config.ContainerNetworkMode` is empty string.
-func (rc *RunContext) networkName() string {
-	return fmt.Sprintf("%s-network", rc.jobContainerName())
+// only create network if using a service container
+func (rc *RunContext) networkName() (string, bool) {
+	if len(rc.Run.Job().Services) >= 0 { // For Gitea, always create network
+		return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
+	}
+	if rc.Config.ContainerNetworkMode == "" {
+		return "host", false
+	}
+	return string(rc.Config.ContainerNetworkMode), false
 }
 
 func getDockerDaemonSocketMountPath(daemonPath string) string {
@@ -135,7 +142,7 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string) {
 	ext := container.LinuxContainerEnvironmentExtensions{}
 
 	mounts := map[string]string{
-		"act-toolcache": "/toolcache",
+		"act-toolcache": "/opt/hostedtoolcache",
 		name + "-env":   ext.GetActPath(),
 	}
 
@@ -247,6 +254,7 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 	}
 }
 
+//nolint:gocyclo
 func (rc *RunContext) startJobContainer() common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
@@ -284,15 +292,12 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		binds, mounts := rc.GetBindsAndMounts()
 
 		// specify the network to which the container will connect when `docker create` stage. (like execute command line: docker create --network <networkName> <image>)
-		networkName := string(rc.Config.ContainerNetworkMode)
-		if networkName == "" {
-			// if networkName is empty string, will create a new network for the containers.
-			// and it will be removed after at last.
-			networkName = rc.networkName()
-		}
+		// if using service containers, will create a new network for the containers.
+		// and it will be removed after at last.
+		networkName, createAndDeleteNetwork := rc.networkName()
 
 		// add service containers
-		for serviceId, spec := range rc.Run.Job().Services {
+		for serviceID, spec := range rc.Run.Job().Services {
 			// interpolate env
 			interpolatedEnvs := make(map[string]string, len(spec.Env))
 			for k, v := range spec.Env {
@@ -302,24 +307,33 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			for k, v := range interpolatedEnvs {
 				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 			}
-			// interpolate cmd
-			interpolatedCmd := make([]string, 0, len(spec.Cmd))
-			for _, v := range spec.Cmd {
-				interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
-			}
-			username, password, err := rc.handleServiceCredentials(ctx, spec.Credentials)
+			username, password, err = rc.handleServiceCredentials(ctx, spec.Credentials)
 			if err != nil {
-				return fmt.Errorf("failed to handle service %s credentials: %w", serviceId, err)
+				return fmt.Errorf("failed to handle service %s credentials: %w", serviceID, err)
 			}
-			serviceBinds, serviceMounts := rc.GetServiceBindsAndMounts(spec.Volumes)
-			serviceContainerName := createSimpleContainerName(rc.jobContainerName(), serviceId)
+
+			interpolatedVolumes := make([]string, 0, len(spec.Volumes))
+			for _, volume := range spec.Volumes {
+				interpolatedVolumes = append(interpolatedVolumes, rc.ExprEval.Interpolate(ctx, volume))
+			}
+			serviceBinds, serviceMounts := rc.GetServiceBindsAndMounts(interpolatedVolumes)
+
+			interpolatedPorts := make([]string, 0, len(spec.Ports))
+			for _, port := range spec.Ports {
+				interpolatedPorts = append(interpolatedPorts, rc.ExprEval.Interpolate(ctx, port))
+			}
+			exposedPorts, portBindings, err := nat.ParsePortSpecs(interpolatedPorts)
+			if err != nil {
+				return fmt.Errorf("failed to parse service %s ports: %w", serviceID, err)
+			}
+
+			serviceContainerName := createContainerName(rc.jobContainerName(), serviceID)
 			c := container.NewContainer(&container.NewContainerInput{
 				Name:           serviceContainerName,
 				WorkingDir:     ext.ToContainerPath(rc.Config.Workdir),
-				Image:          spec.Image,
+				Image:          rc.ExprEval.Interpolate(ctx, spec.Image),
 				Username:       username,
 				Password:       password,
-				Cmd:            interpolatedCmd,
 				Env:            envs,
 				Mounts:         serviceMounts,
 				Binds:          serviceBinds,
@@ -328,22 +342,52 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				Privileged:     rc.Config.Privileged,
 				UsernsMode:     rc.Config.UsernsMode,
 				Platform:       rc.Config.ContainerArchitecture,
-				AutoRemove:     rc.Config.AutoRemove,
-				Options:        spec.Options,
+				Options:        rc.ExprEval.Interpolate(ctx, spec.Options),
 				NetworkMode:    networkName,
-				NetworkAliases: []string{serviceId},
-				ValidVolumes:   rc.Config.ValidVolumes,
+				NetworkAliases: []string{serviceID},
+				ExposedPorts:   exposedPorts,
+				PortBindings:   portBindings,
 			})
 			rc.ServiceContainers = append(rc.ServiceContainers, c)
 		}
 
 		rc.cleanUpJobContainer = func(ctx context.Context) error {
-			if rc.JobContainer != nil && !rc.Config.ReuseContainers {
-				return rc.JobContainer.Remove().
-					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName(), false)).
-					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName()+"-env", false))(ctx)
+			reuseJobContainer := func(ctx context.Context) bool {
+				return rc.Config.ReuseContainers
+			}
+
+			if rc.JobContainer != nil {
+				return rc.JobContainer.Remove().IfNot(reuseJobContainer).
+					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName(), false)).IfNot(reuseJobContainer).
+					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName()+"-env", false)).IfNot(reuseJobContainer).
+					Then(func(ctx context.Context) error {
+						if len(rc.ServiceContainers) > 0 {
+							logger.Infof("Cleaning up services for job %s", rc.JobName)
+							if err := rc.stopServiceContainers()(ctx); err != nil {
+								logger.Errorf("Error while cleaning services: %v", err)
+							}
+							if createAndDeleteNetwork {
+								// clean network if it has been created by act
+								// if using service containers
+								// it means that the network to which containers are connecting is created by `act_runner`,
+								// so, we should remove the network at last.
+								logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
+								if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
+									logger.Errorf("Error while cleaning network: %v", err)
+								}
+							}
+						}
+						return nil
+					})(ctx)
 			}
 			return nil
+		}
+
+		jobContainerNetwork := rc.Config.ContainerNetworkMode.NetworkName()
+		if rc.containerImage(ctx) != "" {
+			jobContainerNetwork = networkName
+		} else if jobContainerNetwork == "" {
+			jobContainerNetwork = "host"
 		}
 
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
@@ -356,7 +400,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			Name:           name,
 			Env:            envList,
 			Mounts:         mounts,
-			NetworkMode:    networkName,
+			NetworkMode:    jobContainerNetwork,
 			NetworkAliases: []string{rc.Name},
 			Binds:          binds,
 			Stdout:         logWriter,
@@ -375,7 +419,8 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		return common.NewPipelineExecutor(
 			rc.pullServicesImages(rc.Config.ForcePull),
 			rc.JobContainer.Pull(rc.Config.ForcePull),
-			container.NewDockerNetworkCreateExecutor(networkName).IfBool(!rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == ""), // if the value of `ContainerNetworkMode` is empty string, then will create a new network for containers.
+			rc.stopJobContainer(),
+			container.NewDockerNetworkCreateExecutor(networkName).IfBool(createAndDeleteNetwork),
 			rc.startServiceContainers(networkName),
 			rc.JobContainer.Create(rc.Config.ContainerCapAdd, rc.Config.ContainerCapDrop),
 			rc.JobContainer.Start(false),
@@ -452,10 +497,10 @@ func (rc *RunContext) UpdateExtraPath(ctx context.Context, githubEnvPath string)
 	return nil
 }
 
-// stopJobContainer removes the job container (if it exists) and its volume (if it exists) if !rc.Config.ReuseContainers
+// stopJobContainer removes the job container (if it exists) and its volume (if it exists)
 func (rc *RunContext) stopJobContainer() common.Executor {
 	return func(ctx context.Context) error {
-		if rc.cleanUpJobContainer != nil && !rc.Config.ReuseContainers {
+		if rc.cleanUpJobContainer != nil {
 			return rc.cleanUpJobContainer(ctx)
 		}
 		return nil
@@ -472,7 +517,7 @@ func (rc *RunContext) pullServicesImages(forcePull bool) common.Executor {
 	}
 }
 
-func (rc *RunContext) startServiceContainers(networkName string) common.Executor {
+func (rc *RunContext) startServiceContainers(_ string) common.Executor {
 	return func(ctx context.Context) error {
 		execs := []common.Executor{}
 		for _, c := range rc.ServiceContainers {
@@ -490,7 +535,7 @@ func (rc *RunContext) stopServiceContainers() common.Executor {
 	return func(ctx context.Context) error {
 		execs := []common.Executor{}
 		for _, c := range rc.ServiceContainers {
-			execs = append(execs, c.Remove())
+			execs = append(execs, c.Remove().Finally(c.Close()))
 		}
 		return common.NewParallelExecutor(len(execs), execs...)(ctx)
 	}
@@ -610,12 +655,11 @@ func (rc *RunContext) containerImage(ctx context.Context) string {
 }
 
 func (rc *RunContext) runsOnImage(ctx context.Context) string {
-	job := rc.Run.Job()
-
-	if job.RunsOn() == nil {
+	if rc.Run.Job().RunsOn() == nil {
 		common.Logger(ctx).Errorf("'runs-on' key not defined in %s", rc.String())
 	}
 
+	job := rc.Run.Job()
 	runsOn := job.RunsOn()
 	for i, v := range runsOn {
 		runsOn[i] = rc.ExprEval.Interpolate(ctx, v)
@@ -627,14 +671,29 @@ func (rc *RunContext) runsOnImage(ctx context.Context) string {
 		}
 	}
 
-	for _, runnerLabel := range runsOn {
-		image := rc.Config.Platforms[strings.ToLower(runnerLabel)]
+	for _, platformName := range rc.runsOnPlatformNames(ctx) {
+		image := rc.Config.Platforms[strings.ToLower(platformName)]
 		if image != "" {
 			return image
 		}
 	}
 
 	return ""
+}
+
+func (rc *RunContext) runsOnPlatformNames(ctx context.Context) []string {
+	job := rc.Run.Job()
+
+	if job.RunsOn() == nil {
+		return []string{}
+	}
+
+	if err := rc.ExprEval.EvaluateYamlNode(ctx, &job.RawRunsOn); err != nil {
+		common.Logger(ctx).Errorf("Error while evaluating runs-on: %v", err)
+		return []string{}
+	}
+
+	return job.RunsOn()
 }
 
 func (rc *RunContext) platformImage(ctx context.Context) string {
@@ -667,8 +726,6 @@ func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {
 
 	if jobType == model.JobTypeInvalid {
 		return false, jobTypeErr
-	} else if jobType != model.JobTypeDefault {
-		return true, nil
 	}
 
 	if !runJob {
@@ -676,14 +733,13 @@ func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
+	if jobType != model.JobTypeDefault {
+		return true, nil
+	}
+
 	img := rc.platformImage(ctx)
 	if img == "" {
-		if job.RunsOn() == nil {
-			l.Errorf("'runs-on' key not defined in %s", rc.String())
-		}
-
-		for _, runnerLabel := range job.RunsOn() {
-			platformName := rc.ExprEval.Interpolate(ctx, runnerLabel)
+		for _, platformName := range rc.runsOnPlatformNames(ctx) {
 			l.Infof("\U0001F6A7  Skipping unsupported platform -- Try running with `-P %+v=...`", platformName)
 		}
 		return false, nil
@@ -960,7 +1016,6 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 	env["GITHUB_REF"] = github.Ref
 	env["GITHUB_REF_NAME"] = github.RefName
 	env["GITHUB_REF_TYPE"] = github.RefType
-	env["GITHUB_TOKEN"] = github.Token
 	env["GITHUB_JOB"] = github.Job
 	env["GITHUB_REPOSITORY_OWNER"] = github.RepositoryOwner
 	env["GITHUB_RETENTION_DAYS"] = github.RetentionDays
@@ -987,9 +1042,7 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 		setActionRuntimeVars(rc, env)
 	}
 
-	job := rc.Run.Job()
-	for _, runnerLabel := range job.RunsOn() {
-		platformName := rc.ExprEval.Interpolate(ctx, runnerLabel)
+	for _, platformName := range rc.runsOnPlatformNames(ctx) {
 		if platformName != "" {
 			if platformName == "ubuntu-latest" {
 				// hardcode current ubuntu-latest since we have no way to check that 'on the fly'

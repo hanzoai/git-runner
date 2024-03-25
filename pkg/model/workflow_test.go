@@ -153,6 +153,41 @@ jobs:
 	assert.Contains(t, workflow.On(), "pull_request")
 }
 
+func TestReadWorkflow_RunsOnLabels(t *testing.T) {
+	yaml := `
+name: local-action-docker-url
+
+jobs:
+  test:
+    container: nginx:latest
+    runs-on:
+      labels: ubuntu-latest
+    steps:
+    - uses: ./actions/docker-url`
+
+	workflow, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	assert.Equal(t, workflow.Jobs["test"].RunsOn(), []string{"ubuntu-latest"})
+}
+
+func TestReadWorkflow_RunsOnLabelsWithGroup(t *testing.T) {
+	yaml := `
+name: local-action-docker-url
+
+jobs:
+  test:
+    container: nginx:latest
+    runs-on:
+      labels: [ubuntu-latest]
+      group: linux
+    steps:
+    - uses: ./actions/docker-url`
+
+	workflow, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	assert.Equal(t, workflow.Jobs["test"].RunsOn(), []string{"ubuntu-latest", "linux"})
+}
+
 func TestReadWorkflow_StringContainer(t *testing.T) {
 	yaml := `
 name: local-action-docker-url
@@ -463,4 +498,108 @@ func TestStep_ShellCommand(t *testing.T) {
 			assert.Equal(t, got, tt.want)
 		})
 	}
+}
+
+func TestReadWorkflow_WorkflowDispatchConfig(t *testing.T) {
+	yaml := `
+    name: local-action-docker-url
+    `
+	workflow, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch := workflow.WorkflowDispatchConfig()
+	assert.Nil(t, workflowDispatch)
+
+	yaml = `
+    name: local-action-docker-url
+    on: push
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.Nil(t, workflowDispatch)
+
+	yaml = `
+    name: local-action-docker-url
+    on: workflow_dispatch
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.NotNil(t, workflowDispatch)
+	assert.Nil(t, workflowDispatch.Inputs)
+
+	yaml = `
+    name: local-action-docker-url
+    on: [push, pull_request]
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.Nil(t, workflowDispatch)
+
+	yaml = `
+    name: local-action-docker-url
+    on: [push, workflow_dispatch]
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.NotNil(t, workflowDispatch)
+	assert.Nil(t, workflowDispatch.Inputs)
+
+	yaml = `
+    name: local-action-docker-url
+    on:
+        - push
+        - workflow_dispatch
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.NotNil(t, workflowDispatch)
+	assert.Nil(t, workflowDispatch.Inputs)
+
+	yaml = `
+    name: local-action-docker-url
+    on:
+        push:
+        pull_request:
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.Nil(t, workflowDispatch)
+
+	yaml = `
+    name: local-action-docker-url
+    on:
+        push:
+        pull_request:
+        workflow_dispatch:
+            inputs:
+                logLevel:
+                    description: 'Log level'
+                    required: true
+                    default: 'warning'
+                    type: choice
+                    options:
+                    - info
+                    - warning
+                    - debug
+    `
+	workflow, err = ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	workflowDispatch = workflow.WorkflowDispatchConfig()
+	assert.NotNil(t, workflowDispatch)
+	assert.Equal(t, WorkflowDispatchInput{
+		Default:     "warning",
+		Description: "Log level",
+		Options: []string{
+			"info",
+			"warning",
+			"debug",
+		},
+		Required: true,
+		Type:     "choice",
+	}, workflowDispatch.Inputs["logLevel"])
 }

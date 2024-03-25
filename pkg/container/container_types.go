@@ -4,34 +4,36 @@ import (
 	"context"
 	"io"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/nektos/act/pkg/common"
 )
 
 // NewContainerInput the input for the New function
 type NewContainerInput struct {
-	Image       string
-	Username    string
-	Password    string
-	Entrypoint  []string
-	Cmd         []string
-	WorkingDir  string
-	Env         []string
-	Binds       []string
-	Mounts      map[string]string
-	Name        string
-	Stdout      io.Writer
-	Stderr      io.Writer
-	NetworkMode string
-	Privileged  bool
-	UsernsMode  string
-	Platform    string
-	Options     string
+	Image          string
+	Username       string
+	Password       string
+	Entrypoint     []string
+	Cmd            []string
+	WorkingDir     string
+	Env            []string
+	Binds          []string
+	Mounts         map[string]string
+	Name           string
+	Stdout         io.Writer
+	Stderr         io.Writer
+	NetworkMode    string
+	Privileged     bool
+	UsernsMode     string
+	Platform       string
+	Options        string
+	NetworkAliases []string
+	ExposedPorts   nat.PortSet
+	PortBindings   nat.PortMap
 
 	// Gitea specific
-	AutoRemove bool
-
-	NetworkAliases []string
-	ValidVolumes   []string
+	AutoRemove   bool
+	ValidVolumes []string
 }
 
 // FileEntry is a file to copy to a container

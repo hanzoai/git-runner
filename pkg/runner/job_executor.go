@@ -20,6 +20,7 @@ type jobInfo interface {
 	result(result string)
 }
 
+//nolint:contextcheck,gocyclo
 func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executor {
 	steps := make([]common.Executor, 0)
 	preSteps := make([]common.Executor, 0)
@@ -101,7 +102,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 
 		postExec := useStepLogger(rc, stepModel, stepStagePost, step.post())
 		if postExecutor != nil {
-			// run the post exector in reverse order
+			// run the post executor in reverse order
 			postExecutor = postExec.Finally(postExecutor)
 		} else {
 			postExecutor = postExec
@@ -131,8 +132,9 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 				// if the value of `ContainerNetworkMode` is empty string,
 				// it means that the network to which containers are connecting is created by `act_runner`,
 				// so, we should remove the network at last.
-				logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, rc.networkName())
-				if err := container.NewDockerNetworkRemoveExecutor(rc.networkName())(ctx); err != nil {
+				networkName, _ := rc.networkName()
+				logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
+				if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
 					logger.Errorf("Error while cleaning network: %v", err)
 				}
 			}
