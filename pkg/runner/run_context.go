@@ -95,16 +95,25 @@ func (rc *RunContext) jobContainerName() string {
 	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+rc.Run.Workflow.Name, "JOB-"+rc.Name)
 }
 
+// Deprecated: use `networkNameForGitea`
 // networkName return the name of the network which will be created by `act` automatically for job,
 // only create network if using a service container
 func (rc *RunContext) networkName() (string, bool) {
-	if len(rc.Run.Job().Services) >= 0 { // For Gitea, always create network
+	if len(rc.Run.Job().Services) > 0 {
 		return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
 	}
 	if rc.Config.ContainerNetworkMode == "" {
 		return "host", false
 	}
 	return string(rc.Config.ContainerNetworkMode), false
+}
+
+// networkNameForGitea return the name of the network
+func (rc *RunContext) networkNameForGitea() (string, bool) {
+	if rc.Config.ContainerNetworkMode != "" {
+		return string(rc.Config.ContainerNetworkMode), false
+	}
+	return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
 }
 
 func getDockerDaemonSocketMountPath(daemonPath string) string {
@@ -294,7 +303,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		// specify the network to which the container will connect when `docker create` stage. (like execute command line: docker create --network <networkName> <image>)
 		// if using service containers, will create a new network for the containers.
 		// and it will be removed after at last.
-		networkName, createAndDeleteNetwork := rc.networkName()
+		networkName, createAndDeleteNetwork := rc.networkNameForGitea()
 
 		// add service containers
 		for serviceID, spec := range rc.Run.Job().Services {
@@ -306,6 +315,11 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			envs := make([]string, 0, len(interpolatedEnvs))
 			for k, v := range interpolatedEnvs {
 				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+			}
+			// interpolate cmd
+			interpolatedCmd := make([]string, 0, len(spec.Cmd))
+			for _, v := range spec.Cmd {
+				interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
 			}
 			username, password, err = rc.handleServiceCredentials(ctx, spec.Credentials)
 			if err != nil {
@@ -334,6 +348,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				Image:          rc.ExprEval.Interpolate(ctx, spec.Image),
 				Username:       username,
 				Password:       password,
+				Cmd:            interpolatedCmd,
 				Env:            envs,
 				Mounts:         serviceMounts,
 				Binds:          serviceBinds,
@@ -342,6 +357,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				Privileged:     rc.Config.Privileged,
 				UsernsMode:     rc.Config.UsernsMode,
 				Platform:       rc.Config.ContainerArchitecture,
+				AutoRemove:     rc.Config.AutoRemove,
 				Options:        rc.ExprEval.Interpolate(ctx, spec.Options),
 				NetworkMode:    networkName,
 				NetworkAliases: []string{serviceID},
@@ -389,6 +405,9 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		} else if jobContainerNetwork == "" {
 			jobContainerNetwork = "host"
 		}
+
+		// For Gitea, `jobContainerNetwork` should be the same as `networkName`
+		jobContainerNetwork = networkName
 
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
 			Cmd:            nil,
