@@ -382,15 +382,15 @@ func (rc *RunContext) startJobContainer() common.Executor {
 							if err := rc.stopServiceContainers()(ctx); err != nil {
 								logger.Errorf("Error while cleaning services: %v", err)
 							}
-							if createAndDeleteNetwork {
-								// clean network if it has been created by act
-								// if using service containers
-								// it means that the network to which containers are connecting is created by `act_runner`,
-								// so, we should remove the network at last.
-								logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
-								if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
-									logger.Errorf("Error while cleaning network: %v", err)
-								}
+						}
+						if createAndDeleteNetwork {
+							// clean network if it has been created by act
+							// if using service containers
+							// it means that the network to which containers are connecting is created by `act_runner`,
+							// so, we should remove the network at last.
+							logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
+							if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
+								logger.Errorf("Error while cleaning network: %v", err)
 							}
 						}
 						return nil
