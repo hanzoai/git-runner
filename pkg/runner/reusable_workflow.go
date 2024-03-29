@@ -54,9 +54,17 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	uses := rc.Run.Job().Uses
 
-	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
-	if remoteReusableWorkflow == nil {
-		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
+	var remoteReusableWorkflow *remoteReusableWorkflow
+	if strings.HasPrefix(uses, "http://") || strings.HasPrefix(uses, "https://") {
+		remoteReusableWorkflow = newRemoteReusableWorkflowFromAbsoluteURL(uses)
+		if remoteReusableWorkflow == nil {
+			return common.NewErrorExecutor(fmt.Errorf("expected format http(s)://{domain}/{owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
+		}
+	} else {
+		remoteReusableWorkflow = newRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
+		if remoteReusableWorkflow == nil {
+			return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
+		}
 	}
 
 	// uses with safe filename makes the target directory look something like this {owner}-{repo}-.github-workflows-{filename}@{ref}
@@ -223,6 +231,24 @@ func newRemoteReusableWorkflowWithPlat(url, uses string) *remoteReusableWorkflow
 		Filename:    matches[4],
 		Ref:         matches[5],
 		URL:         url,
+	}
+}
+
+// For Gitea
+// newRemoteReusableWorkflowWithPlat create a `remoteReusableWorkflow` from an absolute url
+func newRemoteReusableWorkflowFromAbsoluteURL(uses string) *remoteReusableWorkflow {
+	r := regexp.MustCompile(`^(https?://.*)/([^/]+)/([^/]+)/\.([^/]+)/workflows/([^@]+)@(.*)$`)
+	matches := r.FindStringSubmatch(uses)
+	if len(matches) != 7 {
+		return nil
+	}
+	return &remoteReusableWorkflow{
+		URL:         matches[1],
+		Org:         matches[2],
+		Repo:        matches[3],
+		GitPlatform: matches[4],
+		Filename:    matches[5],
+		Ref:         matches[6],
 	}
 }
 
