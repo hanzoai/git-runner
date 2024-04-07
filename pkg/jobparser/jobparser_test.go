@@ -47,6 +47,11 @@ func TestParse(t *testing.T) {
 			options: nil,
 			wantErr: false,
 		},
+		{
+			name:    "job_name_with_matrix",
+			options: nil,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

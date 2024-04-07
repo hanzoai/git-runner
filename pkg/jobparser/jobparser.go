@@ -51,9 +51,9 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 			if job.Name == "" {
 				job.Name = id
 			}
-			job.Name = nameWithMatrix(job.Name, matrix)
 			job.Strategy.RawMatrix = encodeMatrix(matrix)
 			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars))
+			job.Name = nameWithMatrix(job.Name, matrix, evaluator)
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {
 				runsOn[i] = evaluator.Interpolate(v)
@@ -134,12 +134,16 @@ func encodeRunsOn(runsOn []string) yaml.Node {
 	return node
 }
 
-func nameWithMatrix(name string, m map[string]interface{}) string {
+func nameWithMatrix(name string, m map[string]interface{}, evaluator *ExpressionEvaluator) string {
 	if len(m) == 0 {
 		return name
 	}
 
-	return name + " " + matrixName(m)
+	if !strings.Contains(name, "${{") || !strings.Contains(name, "}}") {
+		return name + " " + matrixName(m)
+	}
+
+	return evaluator.Interpolate(name)
 }
 
 func matrixName(m map[string]interface{}) string {
