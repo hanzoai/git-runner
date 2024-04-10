@@ -112,7 +112,8 @@ func readActionImpl(ctx context.Context, step *model.Step, actionDir string, act
 	defer closer.Close()
 
 	action, err := model.ReadAction(reader)
-	logger.Debugf("Read action %v from '%s'", action, "Unknown")
+	// For Gitea, reduce log noise
+	// logger.Debugf("Read action %v from '%s'", action, "Unknown")
 	return action, err
 }
 
@@ -162,7 +163,8 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 		}
 
 		action := step.getActionModel()
-		logger.Debugf("About to run action %v", action)
+		// For Gitea, reduce log noise
+		// logger.Debugf("About to run action %v", action)
 
 		err := setupActionEnv(ctx, step, remoteAction)
 		if err != nil {

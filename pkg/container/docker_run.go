@@ -445,7 +445,8 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 			ExposedPorts: input.ExposedPorts,
 			Tty:          isTerminal,
 		}
-		logger.Debugf("Common container.Config ==> %+v", config)
+		// For Gitea, reduce log noise
+		// logger.Debugf("Common container.Config ==> %+v", config)
 
 		if len(input.Cmd) != 0 {
 			config.Cmd = input.Cmd
@@ -489,7 +490,8 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 			PortBindings: input.PortBindings,
 			AutoRemove:   input.AutoRemove,
 		}
-		logger.Debugf("Common container.HostConfig ==> %+v", hostConfig)
+		// For Gitea, reduce log noise
+		// logger.Debugf("Common container.HostConfig ==> %+v", hostConfig)
 
 		config, hostConfig, err := cr.mergeContainerConfigs(ctx, config, hostConfig)
 		if err != nil {
@@ -500,7 +502,8 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		config, hostConfig = cr.sanitizeConfig(ctx, config, hostConfig)
 
 		var networkingConfig *network.NetworkingConfig
-		logger.Debugf("input.NetworkAliases ==> %v", input.NetworkAliases)
+		// For Gitea, reduce log noise
+		// logger.Debugf("input.NetworkAliases ==> %v", input.NetworkAliases)
 		n := hostConfig.NetworkMode
 		// IsUserDefined and IsHost are broken on windows
 		if n.IsUserDefined() && n != "host" && len(input.NetworkAliases) > 0 {

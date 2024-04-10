@@ -221,7 +221,8 @@ func setupEnv(ctx context.Context, step step) error {
 		}
 	}
 
-	common.Logger(ctx).Debugf("setupEnv => %v", *step.getEnv())
+	// For Gitea, reduce log noise
+	// common.Logger(ctx).Debugf("setupEnv => %v", *step.getEnv())
 
 	return nil
 }
