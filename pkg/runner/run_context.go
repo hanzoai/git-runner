@@ -410,8 +410,8 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		jobContainerNetwork = networkName
 
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
-			Cmd:            []string{"/bin/sleep", fmt.Sprint(rc.Config.ContainerMaxLifetime.Round(time.Second).Seconds())},
-			Entrypoint:     nil,
+			Cmd:            nil,
+			Entrypoint:     []string{"/bin/sleep", fmt.Sprint(rc.Config.ContainerMaxLifetime.Round(time.Second).Seconds())},
 			WorkingDir:     ext.ToContainerPath(rc.Config.Workdir),
 			Image:          image,
 			Username:       username,
