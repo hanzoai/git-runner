@@ -172,10 +172,20 @@ type RunDefaults struct {
 	WorkingDirectory string `yaml:"working-directory,omitempty"`
 }
 
+type WorkflowDispatchInput struct {
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Required    bool     `yaml:"required"`
+	Default     string   `yaml:"default"`
+	Type        string   `yaml:"type"`
+	Options     []string `yaml:"options"`
+}
+
 type Event struct {
 	Name      string
 	acts      map[string][]string
 	schedules []map[string]string
+	inputs    []WorkflowDispatchInput
 }
 
 func (evt *Event) IsSchedule() bool {
@@ -188,6 +198,47 @@ func (evt *Event) Acts() map[string][]string {
 
 func (evt *Event) Schedules() []map[string]string {
 	return evt.schedules
+}
+
+func (evt *Event) Inputs() []WorkflowDispatchInput {
+	return evt.inputs
+}
+
+func parseWorkflowDispatchInputs(inputs map[string]interface{}) ([]WorkflowDispatchInput, error) {
+	var results []WorkflowDispatchInput
+	for name, input := range inputs {
+		inputMap, ok := input.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid input: %v", input)
+		}
+		input := WorkflowDispatchInput{
+			Name: name,
+		}
+		if desc, ok := inputMap["description"].(string); ok {
+			input.Description = desc
+		}
+		if required, ok := inputMap["required"].(bool); ok {
+			input.Required = required
+		}
+		if defaultVal, ok := inputMap["default"].(string); ok {
+			input.Default = defaultVal
+		}
+		if inputType, ok := inputMap["type"].(string); ok {
+			input.Type = inputType
+		}
+		if options, ok := inputMap["options"].([]string); ok {
+			input.Options = options
+		} else if options, ok := inputMap["options"].([]interface{}); ok {
+			for _, option := range options {
+				if opt, ok := option.(string); ok {
+					input.Options = append(input.Options, opt)
+				}
+			}
+		}
+
+		results = append(results, input)
+	}
+	return results, nil
 }
 
 func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
@@ -228,7 +279,6 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 			if v == nil {
 				res = append(res, &Event{
 					Name: k,
-					acts: map[string][]string{},
 				})
 				continue
 			}
@@ -236,15 +286,14 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 			case string:
 				res = append(res, &Event{
 					Name: k,
-					acts: map[string][]string{},
 				})
 			case []string:
 				res = append(res, &Event{
 					Name: k,
-					acts: map[string][]string{},
 				})
 			case map[string]interface{}:
 				acts := make(map[string][]string, len(t))
+				var inputs []WorkflowDispatchInput
 				for act, branches := range t {
 					switch b := branches.(type) {
 					case string:
@@ -259,13 +308,28 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 								return nil, fmt.Errorf("unknown on type: %#v", branches)
 							}
 						}
+					case map[string]interface{}:
+						if k != "workflow_dispatch" && act != "inputs" {
+							return nil, fmt.Errorf("unknown on type: %#v", branches)
+						}
+						inputs, err = parseWorkflowDispatchInputs(b)
+						if err != nil {
+							return nil, err
+						}
 					default:
 						return nil, fmt.Errorf("unknown on type: %#v", branches)
 					}
 				}
+				if len(inputs) == 0 {
+					inputs = nil
+				}
+				if len(acts) == 0 {
+					acts = nil
+				}
 				res = append(res, &Event{
-					Name: k,
-					acts: acts,
+					Name:   k,
+					acts:   acts,
+					inputs: inputs,
 				})
 			case []interface{}:
 				if k != "schedule" {
@@ -284,6 +348,9 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 							return nil, fmt.Errorf("unknown on type: %#v", v)
 						}
 					}
+				}
+				if len(schedules) == 0 {
+					schedules = nil
 				}
 				res = append(res, &Event{
 					Name:      k,
