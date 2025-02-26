@@ -405,6 +405,13 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 								return nil, err
 							}
 							acts[act] = t
+						case yaml.ScalarNode:
+							var t string
+							err := content.Decode(&t)
+							if err != nil {
+								return nil, err
+							}
+							acts[act] = []string{t}
 						case yaml.MappingNode:
 							if k != "workflow_dispatch" || act != "inputs" {
 								return nil, fmt.Errorf("map should only for workflow_dispatch but %s: %#v", act, content)
