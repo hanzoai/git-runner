@@ -60,10 +60,11 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 			}
 			job.RawRunsOn = encodeRunsOn(runsOn)
 			swf := &SingleWorkflow{
-				Name:     workflow.Name,
-				RawOn:    workflow.RawOn,
-				Env:      workflow.Env,
-				Defaults: workflow.Defaults,
+				Name:           workflow.Name,
+				RawOn:          workflow.RawOn,
+				Env:            workflow.Env,
+				Defaults:       workflow.Defaults,
+				RawPermissions: workflow.RawPermissions,
 			}
 			if err := swf.SetJob(id, job); err != nil {
 				return nil, fmt.Errorf("SetJob: %w", err)

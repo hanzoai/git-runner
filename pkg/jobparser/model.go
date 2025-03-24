@@ -10,11 +10,12 @@ import (
 
 // SingleWorkflow is a workflow with single job and single matrix
 type SingleWorkflow struct {
-	Name     string            `yaml:"name,omitempty"`
-	RawOn    yaml.Node         `yaml:"on,omitempty"`
-	Env      map[string]string `yaml:"env,omitempty"`
-	RawJobs  yaml.Node         `yaml:"jobs,omitempty"`
-	Defaults Defaults          `yaml:"defaults,omitempty"`
+	Name           string            `yaml:"name,omitempty"`
+	RawOn          yaml.Node         `yaml:"on,omitempty"`
+	Env            map[string]string `yaml:"env,omitempty"`
+	RawJobs        yaml.Node         `yaml:"jobs,omitempty"`
+	Defaults       Defaults          `yaml:"defaults,omitempty"`
+	RawPermissions yaml.Node         `yaml:"permissions,omitempty"`
 }
 
 func (w *SingleWorkflow) Job() (string, *Job) {
@@ -84,6 +85,7 @@ type Job struct {
 	With           map[string]interface{}    `yaml:"with,omitempty"`
 	RawSecrets     yaml.Node                 `yaml:"secrets,omitempty"`
 	RawConcurrency *model.RawConcurrency     `yaml:"concurrency,omitempty"`
+	RawPermissions yaml.Node                 `yaml:"permissions,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -107,6 +109,7 @@ func (j *Job) Clone() *Job {
 		With:           j.With,
 		RawSecrets:     j.RawSecrets,
 		RawConcurrency: j.RawConcurrency,
+		RawPermissions: j.RawPermissions,
 	}
 }
 
