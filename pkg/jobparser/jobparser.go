@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
 )
 
@@ -40,6 +41,10 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid jobs: %w", err)
 	}
+
+	evaluator := NewExpressionEvaluator(exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{Github: pc.gitContext, Vars: pc.vars}, exprparser.Config{}))
+	workflow.RunName = evaluator.Interpolate(workflow.RunName)
+
 	for i, id := range ids {
 		job := jobs[i]
 		matricxes, err := getMatrixes(origin.GetJob(id))
@@ -65,6 +70,7 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 				Env:            workflow.Env,
 				Defaults:       workflow.Defaults,
 				RawPermissions: workflow.RawPermissions,
+				RunName:        workflow.RunName,
 			}
 			if err := swf.SetJob(id, job); err != nil {
 				return nil, fmt.Errorf("SetJob: %w", err)

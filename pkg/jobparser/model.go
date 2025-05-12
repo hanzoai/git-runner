@@ -16,6 +16,7 @@ type SingleWorkflow struct {
 	RawJobs        yaml.Node         `yaml:"jobs,omitempty"`
 	Defaults       Defaults          `yaml:"defaults,omitempty"`
 	RawPermissions yaml.Node         `yaml:"permissions,omitempty"`
+	RunName        string            `yaml:"run-name,omitempty"`
 }
 
 func (w *SingleWorkflow) Job() (string, *Job) {
