@@ -778,4 +778,22 @@ func decodeNode(node yaml.Node, out interface{}) bool {
 type RawConcurrency struct {
 	Group            string `yaml:"group,omitempty"`
 	CancelInProgress string `yaml:"cancel-in-progress,omitempty"`
+	RawExpression    string `yaml:"-,omitempty"`
+}
+
+type objectConcurrency RawConcurrency
+
+func (r *RawConcurrency) UnmarshalYAML(n *yaml.Node) error {
+	if err := n.Decode(&r.RawExpression); err == nil {
+		return nil
+	}
+	return n.Decode((*objectConcurrency)(r))
+}
+
+func (r *RawConcurrency) MarshalYAML() (interface{}, error) {
+	if r.RawExpression != "" {
+		return r.RawExpression, nil
+	}
+
+	return (*objectConcurrency)(r), nil
 }

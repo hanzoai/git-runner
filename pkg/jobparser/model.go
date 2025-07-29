@@ -276,9 +276,21 @@ func EvaluateConcurrency(rc *model.RawConcurrency, jobID string, job *Job, gitCt
 	}
 
 	evaluator := NewExpressionEvaluator(NewInterpeter(jobID, actJob, matrix, toGitContext(gitCtx), results, vars, inputs))
-	group := evaluator.Interpolate(rc.Group)
-	cancelInProgress := evaluator.Interpolate(rc.CancelInProgress)
-	return group, cancelInProgress == "true", nil
+	var node yaml.Node
+	if err := node.Encode(rc); err != nil {
+		return "", false, fmt.Errorf("failed to encode concurrency: %w", err)
+	}
+	if err := evaluator.EvaluateYamlNode(&node); err != nil {
+		return "", false, fmt.Errorf("failed to evaluate concurrency: %w", err)
+	}
+	var evaluated model.RawConcurrency
+	if err := node.Decode(&evaluated); err != nil {
+		return "", false, fmt.Errorf("failed to unmarshal evaluated concurrency: %w", err)
+	}
+	if evaluated.RawExpression != "" {
+		return evaluated.RawExpression, false, nil
+	}
+	return evaluated.Group, evaluated.CancelInProgress == "true", nil
 }
 
 func toGitContext(input map[string]any) *model.GithubContext {
