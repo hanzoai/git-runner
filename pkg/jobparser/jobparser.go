@@ -42,7 +42,7 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 		return nil, fmt.Errorf("invalid jobs: %w", err)
 	}
 
-	evaluator := NewExpressionEvaluator(exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{Github: pc.gitContext, Vars: pc.vars}, exprparser.Config{}))
+	evaluator := NewExpressionEvaluator(exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{Github: pc.gitContext, Vars: pc.vars, Inputs: pc.inputs}, exprparser.Config{}))
 	workflow.RunName = evaluator.Interpolate(workflow.RunName)
 
 	for i, id := range ids {
@@ -57,7 +57,7 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 				job.Name = id
 			}
 			job.Strategy.RawMatrix = encodeMatrix(matrix)
-			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, nil))
+			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs))
 			job.Name = nameWithMatrix(job.Name, matrix, evaluator)
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {
@@ -99,10 +99,17 @@ func WithVars(vars map[string]string) ParseOption {
 	}
 }
 
+func WithInputs(inputs map[string]any) ParseOption {
+	return func(c *parseContext) {
+		c.inputs = inputs
+	}
+}
+
 type parseContext struct {
 	jobResults map[string]string
 	gitContext *model.GithubContext
 	vars       map[string]string
+	inputs     map[string]any
 }
 
 type ParseOption func(c *parseContext)
