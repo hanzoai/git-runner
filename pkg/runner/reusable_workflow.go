@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -77,8 +78,7 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 		return newActionCacheReusableWorkflowExecutor(rc, filename, remoteReusableWorkflow)
 	}
 
-	// FIXME: if the reusable workflow is from a private repository, we need to provide a token to access the repository.
-	token := ""
+	token := getGitCloneToken(rc.Config, remoteReusableWorkflow.CloneURL())
 
 	return common.NewPipelineExecutor(
 		newMutexExecutor(cloneIfRequired(rc, *remoteReusableWorkflow, workflowDir, token)),
@@ -318,4 +318,26 @@ func setReusedWorkflowCallerResult(rc *RunContext, runner Runner) common.Executo
 
 		return nil
 	}
+}
+
+// For Gitea
+// getGitCloneToken returns GITEA_TOKEN when checkCloneURL returns true,
+// otherwise returns an empty string
+func getGitCloneToken(conf *Config, cloneURL string) string {
+	if !checkCloneURL(conf.GitHubInstance, cloneURL) {
+		return ""
+	}
+	return conf.GetToken()
+}
+
+// For Gitea
+// checkCloneURL returns true when the cloneURL is from the same Gitea instance that the runner is registered to
+func checkCloneURL(instanceURL, cloneURL string) bool {
+	u1, err1 := url.Parse(instanceURL)
+	u2, err2 := url.Parse(cloneURL)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	return u1.Host == u2.Host
 }
