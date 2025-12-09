@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/nektos/act/pkg/model"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // SingleWorkflow is a workflow with single job and single matrix
@@ -50,16 +50,18 @@ func (w *SingleWorkflow) SetJob(id string, job *Job) error {
 	m := map[string]*Job{
 		id: job,
 	}
-	out, err := yaml.Marshal(m)
-	if err != nil {
-		return err
-	}
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	encoder.Encode(m)
+	encoder.Close()
+
 	node := yaml.Node{}
-	if err := yaml.Unmarshal(out, &node); err != nil {
+	if err := yaml.Unmarshal(buf.Bytes(), &node); err != nil {
 		return err
 	}
 	if len(node.Content) != 1 || node.Content[0].Kind != yaml.MappingNode {
-		return fmt.Errorf("can not set job: %q", out)
+		return fmt.Errorf("can not set job: %s", buf.String())
 	}
 	w.RawJobs = *node.Content[0]
 	return nil
