@@ -21,6 +21,8 @@ DOCKER_TAG ?= nightly
 DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 DOCKER_ROOTLESS_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)-dind-rootless
 
+GOVULNCHECK_PACKAGE ?= golang.org/x/vuln/cmd/govulncheck@v1
+
 ifneq ($(shell uname), Darwin)
 	EXTLDFLAGS = -extldflags "-static" $(null)
 else
@@ -102,7 +104,15 @@ fmt-check:
 		exit 1; \
 	fi;
 
-test: fmt-check
+.PHONY: deps-tools
+deps-tools: ## install tool dependencies
+	$(GO) install $(GOVULNCHECK_PACKAGE)
+
+.PHONY: security-check
+security-check: deps-tools
+	GOEXPERIMENT= $(GO) run $(GOVULNCHECK_PACKAGE) -show color ./...
+
+test: fmt-check security-check
 	@$(GO) test -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
 .PHONY: vet
