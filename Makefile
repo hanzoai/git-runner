@@ -1,7 +1,6 @@
 DIST := dist
 EXECUTABLE := act_runner
 GOFMT ?= gofumpt -l
-DIST := dist
 DIST_DIRS := $(DIST)/binaries $(DIST)/release
 GO ?= go
 SHASUM ?= shasum -a 256
