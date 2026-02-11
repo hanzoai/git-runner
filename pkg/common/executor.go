@@ -101,12 +101,19 @@ func NewParallelExecutor(parallel int, executors ...Executor) Executor {
 			parallel = 1
 		}
 
+		log.Infof("NewParallelExecutor: Creating %d workers for %d executors", parallel, len(executors))
+
 		for i := 0; i < parallel; i++ {
-			go func(work <-chan Executor, errs chan<- error) {
+			go func(workerID int, work <-chan Executor, errs chan<- error) {
+				log.Debugf("Worker %d started", workerID)
+				taskCount := 0
 				for executor := range work {
+					taskCount++
+					log.Debugf("Worker %d executing task %d", workerID, taskCount)
 					errs <- executor(ctx)
 				}
-			}(work, errs)
+				log.Debugf("Worker %d finished (%d tasks executed)", workerID, taskCount)
+			}(i, work, errs)
 		}
 
 		for i := 0; i < len(executors); i++ {

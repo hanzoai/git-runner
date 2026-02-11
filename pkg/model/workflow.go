@@ -396,6 +396,7 @@ func (j *Job) Matrix() map[string][]interface{} {
 func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 	matrixes := make([]map[string]interface{}, 0)
 	if j.Strategy != nil {
+		// Always set these values, even if there's an error later
 		j.Strategy.FailFast = j.Strategy.GetFailFast()
 		j.Strategy.MaxParallel = j.Strategy.GetMaxParallel()
 
