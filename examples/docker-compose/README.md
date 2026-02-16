@@ -53,6 +53,9 @@
     environment:
       - GITEA_INSTANCE_URL=<instance url>
       - DOCKER_HOST=unix:///var/run/user/1000/docker.sock
+      # Use slirp4netns instead of vpnkit for significantly better network throughput.
+      - DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns
+      - DOCKERD_ROOTLESS_ROOTLESSKIT_MTU=65520
       # When using Docker Secrets, it's also possible to use
       # GITEA_RUNNER_REGISTRATION_TOKEN_FILE to pass the location.
       # The env var takes precedence.
