@@ -21,6 +21,8 @@ require (
 	gotest.tools/v3 v3.5.1
 )
 
+require go.yaml.in/yaml/v4 v4.0.0-rc.2
+
 require (
 	cyphar.com/go-pathrs v0.2.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
@@ -100,7 +102,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/nektos/act => gitea.com/gitea/act v0.261.7-0.20251202193638-5417d3ac6742
+replace github.com/nektos/act => gitea.com/gitea/act v0.261.8
 
 replace github.com/go-git/go-git/v5 => github.com/go-git/go-git/v5 v5.16.2
 
