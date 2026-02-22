@@ -196,8 +196,23 @@ func TestReporter_Fire(t *testing.T) {
 		assert.NoError(t, reporter.Fire(&log.Entry{Message: "::debug::debug log line", Data: dataStep0}))
 		assert.NoError(t, reporter.Fire(&log.Entry{Message: "::debug::debug log line", Data: dataStep0}))
 		assert.NoError(t, reporter.Fire(&log.Entry{Message: "regular log line", Data: dataStep0}))
+		assert.NoError(t, reporter.Fire(&log.Entry{Message: "composite step result", Data: map[string]interface{}{
+			"stage":      "Main",
+			"stepID":     []string{"0", "0"},
+			"stepNumber": 0,
+			"raw_output": true,
+			"stepResult": "failure",
+		}}))
+		assert.Equal(t, runnerv1.Result_RESULT_UNSPECIFIED, reporter.state.Steps[0].Result)
+		assert.NoError(t, reporter.Fire(&log.Entry{Message: "step result", Data: map[string]interface{}{
+			"stage":      "Main",
+			"stepNumber": 0,
+			"raw_output": true,
+			"stepResult": "success",
+		}}))
+		assert.Equal(t, runnerv1.Result_RESULT_SUCCESS, reporter.state.Steps[0].Result)
 
-		assert.Equal(t, int64(3), reporter.state.Steps[0].LogLength)
+		assert.Equal(t, int64(5), reporter.state.Steps[0].LogLength)
 	})
 }
 

@@ -96,6 +96,18 @@ func appendIfNotNil[T any](s []*T, v *T) []*T {
 	return s
 }
 
+// isJobStepEntry is used to not report composite step results incorrectly as step result
+// returns true if the logentry is on job level
+// returns false for composite action step messages
+func isJobStepEntry(entry *log.Entry) bool {
+	if v, ok := entry.Data["stepID"]; ok {
+		if v, ok := v.([]string); ok && len(v) > 1 {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Reporter) Fire(entry *log.Entry) error {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
@@ -166,7 +178,7 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 	} else if !r.duringSteps() {
 		r.logRows = appendIfNotNil(r.logRows, r.parseLogRow(entry))
 	}
-	if v, ok := entry.Data["stepResult"]; ok {
+	if v, ok := entry.Data["stepResult"]; ok && isJobStepEntry(entry) {
 		if stepResult, ok := r.parseResult(v); ok {
 			if step.LogLength == 0 {
 				step.LogIndex = int64(r.logOffset + len(r.logRows))
