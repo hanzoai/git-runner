@@ -6,7 +6,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -77,7 +79,7 @@ func (i *executeArgs) LoadSecrets() map[string]string {
 	for _, secretPair := range i.secrets {
 		secretPairParts := strings.SplitN(secretPair, "=", 2)
 		secretPairParts[0] = strings.ToUpper(secretPairParts[0])
-		if strings.ToUpper(s[secretPairParts[0]]) == secretPairParts[0] {
+		if strings.EqualFold(s[secretPairParts[0]], secretPairParts[0]) {
 			log.Errorf("Secret %s is already defined (secrets are case insensitive)", secretPairParts[0])
 		}
 		if len(secretPairParts) == 2 {
@@ -104,9 +106,7 @@ func readEnvs(path string, envs map[string]string) bool {
 		if err != nil {
 			log.Fatalf("Error loading from %s: %v", path, err)
 		}
-		for k, v := range env {
-			envs[k] = v
-		}
+		maps.Copy(envs, env)
 		return true
 	}
 	return false
@@ -166,7 +166,7 @@ func (i *executeArgs) resolve(path string) string {
 	return path
 }
 
-func printList(plan *model.Plan) error {
+func printList(plan *model.Plan) {
 	type lineInfoDef struct {
 		jobID   string
 		jobName string
@@ -261,10 +261,9 @@ func printList(plan *model.Plan) error {
 	if duplicateJobIDs {
 		fmt.Print("\nDetected multiple jobs with the same job name, use `-W` to specify the path to the specific workflow.\n")
 	}
-	return nil
 }
 
-func runExecList(ctx context.Context, planner model.WorkflowPlanner, execArgs *executeArgs) error {
+func runExecList(planner model.WorkflowPlanner, execArgs *executeArgs) error {
 	// plan with filtered jobs - to be used for filtering only
 	var filterPlan *model.Plan
 
@@ -306,7 +305,7 @@ func runExecList(ctx context.Context, planner model.WorkflowPlanner, execArgs *e
 		}
 	}
 
-	_ = printList(filterPlan)
+	printList(filterPlan)
 
 	return nil
 }
@@ -319,7 +318,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		}
 
 		if execArgs.runList {
-			return runExecList(ctx, planner, execArgs)
+			return runExecList(planner, execArgs)
 		}
 
 		// plan with triggered jobs
@@ -378,7 +377,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		if len(execArgs.artifactServerAddr) == 0 {
 			ip := common.GetOutboundIP()
 			if ip == nil {
-				return fmt.Errorf("unable to determine outbound IP address")
+				return errors.New("unable to determine outbound IP address")
 			}
 			execArgs.artifactServerAddr = ip.String()
 		}
@@ -422,7 +421,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			NoSkipCheckout:        execArgs.noSkipCheckout,
 			// PresetGitHubContext:   preset,
 			// EventJSON:             string(eventJSON),
-			ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%s", eventName),
+			ContainerNamePrefix:   "GITEA-ACTIONS-TASK-" + eventName,
 			ContainerMaxLifetime:  maxLifetime,
 			ContainerNetworkMode:  container.NetworkMode(execArgs.network),
 			DefaultActionInstance: execArgs.defaultActionsURL,
