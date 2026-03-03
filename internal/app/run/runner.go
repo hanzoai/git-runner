@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -196,11 +197,18 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		maxLifetime = time.Until(deadline)
 	}
 
+	workdirParent := strings.TrimLeft(r.cfg.Container.WorkdirParent, "/")
+	if r.cfg.Container.BindWorkdir {
+		// Append the task ID to isolate concurrent jobs from the same repo.
+		workdirParent = fmt.Sprintf("%s/%d", workdirParent, task.Id)
+	}
+	workdir := filepath.FromSlash(fmt.Sprintf("/%s/%s", workdirParent, preset.Repository))
+
 	runnerConfig := &runner.Config{
 		// On Linux, Workdir will be like "/<parent_directory>/<owner>/<repo>"
 		// On Windows, Workdir will be like "\<parent_directory>\<owner>\<repo>"
-		Workdir:        filepath.FromSlash(fmt.Sprintf("/%s/%s", strings.TrimLeft(r.cfg.Container.WorkdirParent, "/"), preset.Repository)),
-		BindWorkdir:    false,
+		Workdir:        workdir,
+		BindWorkdir:    r.cfg.Container.BindWorkdir,
 		ActionCacheDir: filepath.FromSlash(r.cfg.Host.WorkdirParent),
 
 		ReuseContainers:       false,
@@ -245,6 +253,15 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	execErr := executor(ctx)
 	reporter.SetOutputs(job.Outputs)
+
+	if r.cfg.Container.BindWorkdir {
+		// Remove the entire task-specific directory (e.g. /workspace/<task_id>).
+		taskDir := filepath.FromSlash("/" + workdirParent)
+		if err := os.RemoveAll(taskDir); err != nil {
+			log.Warnf("failed to clean up workspace %s: %v", taskDir, err)
+		}
+	}
+
 	return execErr
 }
 
