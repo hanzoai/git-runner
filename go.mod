@@ -14,14 +14,13 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
+	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/term v0.40.0
 	golang.org/x/time v0.14.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
 )
-
-require go.yaml.in/yaml/v4 v4.0.0-rc.3
 
 require (
 	cyphar.com/go-pathrs v0.2.3 // indirect
@@ -110,7 +109,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/nektos/act => gitea.com/gitea/act v0.261.8
+replace github.com/nektos/act => gitea.com/gitea/act v0.261.10
 
 // Remove after github.com/docker/distribution is updated to support distribution/reference v0.6.0
 // (pulled in via moby/buildkit, breaks on undefined: reference.SplitHostname)
