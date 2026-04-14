@@ -22,17 +22,22 @@ type Log struct {
 
 // Runner represents the configuration for the runner.
 type Runner struct {
-	File            string            `yaml:"file"`             // File specifies the file path for the runner.
-	Capacity        int               `yaml:"capacity"`         // Capacity specifies the capacity of the runner.
-	Envs            map[string]string `yaml:"envs"`             // Envs stores environment variables for the runner.
-	EnvFile         string            `yaml:"env_file"`         // EnvFile specifies the path to the file containing environment variables for the runner.
-	Timeout         time.Duration     `yaml:"timeout"`          // Timeout specifies the duration for runner timeout.
-	ShutdownTimeout time.Duration     `yaml:"shutdown_timeout"` // ShutdownTimeout specifies the duration to wait for running jobs to complete during a shutdown of the runner.
-	Insecure        bool              `yaml:"insecure"`         // Insecure indicates whether the runner operates in an insecure mode.
-	FetchTimeout    time.Duration     `yaml:"fetch_timeout"`    // FetchTimeout specifies the timeout duration for fetching resources.
-	FetchInterval   time.Duration     `yaml:"fetch_interval"`   // FetchInterval specifies the interval duration for fetching resources.
-	Labels          []string          `yaml:"labels"`           // Labels specify the labels of the runner. Labels are declared on each startup
-	GithubMirror    string            `yaml:"github_mirror"`    // GithubMirror defines what mirrors should be used when using github
+	File                string            `yaml:"file"`                   // File specifies the file path for the runner.
+	Capacity            int               `yaml:"capacity"`               // Capacity specifies the capacity of the runner.
+	Envs                map[string]string `yaml:"envs"`                   // Envs stores environment variables for the runner.
+	EnvFile             string            `yaml:"env_file"`               // EnvFile specifies the path to the file containing environment variables for the runner.
+	Timeout             time.Duration     `yaml:"timeout"`                // Timeout specifies the duration for runner timeout.
+	ShutdownTimeout     time.Duration     `yaml:"shutdown_timeout"`       // ShutdownTimeout specifies the duration to wait for running jobs to complete during a shutdown of the runner.
+	Insecure            bool              `yaml:"insecure"`               // Insecure indicates whether the runner operates in an insecure mode.
+	FetchTimeout        time.Duration     `yaml:"fetch_timeout"`          // FetchTimeout specifies the timeout duration for fetching resources.
+	FetchInterval       time.Duration     `yaml:"fetch_interval"`         // FetchInterval specifies the interval duration for fetching resources.
+	FetchIntervalMax    time.Duration     `yaml:"fetch_interval_max"`     // FetchIntervalMax specifies the maximum backoff interval when idle.
+	LogReportInterval   time.Duration     `yaml:"log_report_interval"`    // LogReportInterval specifies the base interval for periodic log flush.
+	LogReportMaxLatency time.Duration     `yaml:"log_report_max_latency"` // LogReportMaxLatency specifies the max time a log row can wait before being sent.
+	LogReportBatchSize  int               `yaml:"log_report_batch_size"`  // LogReportBatchSize triggers immediate log flush when buffer reaches this size.
+	StateReportInterval time.Duration     `yaml:"state_report_interval"`  // StateReportInterval specifies the interval for state reporting.
+	Labels              []string          `yaml:"labels"`                 // Labels specify the labels of the runner. Labels are declared on each startup
+	GithubMirror        string            `yaml:"github_mirror"`          // GithubMirror defines what mirrors should be used when using github
 }
 
 // Cache represents the configuration for caching.
@@ -136,6 +141,32 @@ func LoadDefault(file string) (*Config, error) {
 	}
 	if cfg.Runner.FetchInterval <= 0 {
 		cfg.Runner.FetchInterval = 2 * time.Second
+	}
+	if cfg.Runner.FetchIntervalMax <= 0 {
+		cfg.Runner.FetchIntervalMax = 60 * time.Second
+	}
+	if cfg.Runner.LogReportInterval <= 0 {
+		cfg.Runner.LogReportInterval = 5 * time.Second
+	}
+	if cfg.Runner.LogReportMaxLatency <= 0 {
+		cfg.Runner.LogReportMaxLatency = 3 * time.Second
+	}
+	if cfg.Runner.LogReportBatchSize <= 0 {
+		cfg.Runner.LogReportBatchSize = 100
+	}
+	if cfg.Runner.StateReportInterval <= 0 {
+		cfg.Runner.StateReportInterval = 5 * time.Second
+	}
+
+	// Validate and fix invalid config combinations to prevent confusing behavior.
+	if cfg.Runner.FetchIntervalMax < cfg.Runner.FetchInterval {
+		log.Warnf("fetch_interval_max (%v) is less than fetch_interval (%v), setting fetch_interval_max to fetch_interval",
+			cfg.Runner.FetchIntervalMax, cfg.Runner.FetchInterval)
+		cfg.Runner.FetchIntervalMax = cfg.Runner.FetchInterval
+	}
+	if cfg.Runner.LogReportMaxLatency >= cfg.Runner.LogReportInterval {
+		log.Warnf("log_report_max_latency (%v) >= log_report_interval (%v), the max-latency timer will never fire before the periodic ticker; consider lowering log_report_max_latency",
+			cfg.Runner.LogReportMaxLatency, cfg.Runner.LogReportInterval)
 	}
 
 	// although `container.network_mode` will be deprecated, but we have to be compatible with it for now.

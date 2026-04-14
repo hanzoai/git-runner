@@ -98,7 +98,7 @@ func (r *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 
 	ctx, cancel := context.WithTimeout(ctx, r.cfg.Runner.Timeout)
 	defer cancel()
-	reporter := report.NewReporter(ctx, cancel, r.client, task)
+	reporter := report.NewReporter(ctx, cancel, r.client, task, r.cfg)
 	var runErr error
 	defer func() {
 		lastWords := ""
