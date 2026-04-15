@@ -19,6 +19,7 @@ import (
 	"gitea.com/gitea/act_runner/internal/app/run"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 )
 
 type Poller struct {
@@ -43,6 +44,10 @@ type Poller struct {
 type workerState struct {
 	consecutiveEmpty  int64
 	consecutiveErrors int64
+	// lastBackoff is the last interval reported to the PollBackoffSeconds gauge
+	// from this worker; used to suppress redundant no-op Set calls when the
+	// backoff plateaus (e.g. at FetchIntervalMax).
+	lastBackoff time.Duration
 }
 
 func New(cfg *config.Config, client client.Client, runner *run.Runner) *Poller {
@@ -166,8 +171,12 @@ func (p *Poller) pollOnce(s *workerState) {
 	for {
 		task, ok := p.fetchTask(p.pollingCtx, s)
 		if !ok {
-			interval := addJitter(p.calculateInterval(s))
-			timer := time.NewTimer(interval)
+			base := p.calculateInterval(s)
+			if base != s.lastBackoff {
+				metrics.PollBackoffSeconds.Set(base.Seconds())
+				s.lastBackoff = base
+			}
+			timer := time.NewTimer(addJitter(base))
 			select {
 			case <-timer.C:
 			case <-p.pollingCtx.Done():
@@ -205,15 +214,27 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*runnerv1.Task,
 
 	// Load the version value that was in the cache when the request was sent.
 	v := p.tasksVersion.Load()
+	start := time.Now()
 	resp, err := p.client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{
 		TasksVersion: v,
 	}))
+
+	// DeadlineExceeded is the designed idle path for a long-poll: the server
+	// found no work within FetchTimeout. Treat it as an empty response and do
+	// not record the duration — the timeout value would swamp the histogram.
 	if errors.Is(err, context.DeadlineExceeded) {
-		err = nil
+		s.consecutiveEmpty++
+		s.consecutiveErrors = 0 // timeout is a healthy idle response
+		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
+		return nil, false
 	}
+	metrics.PollFetchDuration.Observe(time.Since(start).Seconds())
+
 	if err != nil {
 		log.WithError(err).Error("failed to fetch task")
 		s.consecutiveErrors++
+		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultError).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodFetchTask).Inc()
 		return nil, false
 	}
 
@@ -222,6 +243,7 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*runnerv1.Task,
 
 	if resp == nil || resp.Msg == nil {
 		s.consecutiveEmpty++
+		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
 		return nil, false
 	}
 
@@ -231,11 +253,13 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*runnerv1.Task,
 
 	if resp.Msg.Task == nil {
 		s.consecutiveEmpty++
+		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
 		return nil, false
 	}
 
-	// got a task, set `tasksVersion` to zero to focre query db in next request.
+	// got a task, set `tasksVersion` to zero to force query db in next request.
 	p.tasksVersion.CompareAndSwap(resp.Msg.TasksVersion, 0)
 
+	metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultTask).Inc()
 	return resp.Msg.Task, true
 }

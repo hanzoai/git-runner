@@ -70,6 +70,12 @@ type Host struct {
 	WorkdirParent string `yaml:"workdir_parent"` // WorkdirParent specifies the parent directory for the host's working directory.
 }
 
+// Metrics represents the configuration for the Prometheus metrics endpoint.
+type Metrics struct {
+	Enabled bool   `yaml:"enabled"` // Enabled indicates whether the metrics endpoint is exposed.
+	Addr    string `yaml:"addr"`    // Addr specifies the listen address for the metrics HTTP server (e.g., ":9101").
+}
+
 // Config represents the overall configuration.
 type Config struct {
 	Log       Log       `yaml:"log"`       // Log represents the configuration for logging.
@@ -77,6 +83,7 @@ type Config struct {
 	Cache     Cache     `yaml:"cache"`     // Cache represents the configuration for caching.
 	Container Container `yaml:"container"` // Container represents the configuration for the container.
 	Host      Host      `yaml:"host"`      // Host represents the configuration for the host.
+	Metrics   Metrics   `yaml:"metrics"`   // Metrics represents the configuration for the Prometheus metrics endpoint.
 }
 
 // LoadDefault returns the default configuration.
@@ -156,6 +163,9 @@ func LoadDefault(file string) (*Config, error) {
 	}
 	if cfg.Runner.StateReportInterval <= 0 {
 		cfg.Runner.StateReportInterval = 5 * time.Second
+	}
+	if cfg.Metrics.Addr == "" {
+		cfg.Metrics.Addr = "127.0.0.1:9101"
 	}
 
 	// Validate and fix invalid config combinations to prevent confusing behavior.

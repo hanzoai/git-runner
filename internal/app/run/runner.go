@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
@@ -26,6 +27,7 @@ import (
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/labels"
+	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 	"gitea.com/gitea/act_runner/internal/pkg/report"
 	"gitea.com/gitea/act_runner/internal/pkg/ver"
 )
@@ -41,6 +43,7 @@ type Runner struct {
 	envs   map[string]string
 
 	runningTasks sync.Map
+	runningCount atomic.Int64
 }
 
 func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) *Runner {
@@ -96,16 +99,25 @@ func (r *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	r.runningTasks.Store(task.Id, struct{}{})
 	defer r.runningTasks.Delete(task.Id)
 
+	r.runningCount.Add(1)
+
+	start := time.Now()
+
 	ctx, cancel := context.WithTimeout(ctx, r.cfg.Runner.Timeout)
 	defer cancel()
 	reporter := report.NewReporter(ctx, cancel, r.client, task, r.cfg)
 	var runErr error
 	defer func() {
+		r.runningCount.Add(-1)
+
 		lastWords := ""
 		if runErr != nil {
 			lastWords = runErr.Error()
 		}
 		_ = reporter.Close(lastWords)
+
+		metrics.JobDuration.Observe(time.Since(start).Seconds())
+		metrics.JobsTotal.WithLabelValues(metrics.ResultToStatusLabel(reporter.Result())).Inc()
 	}()
 	reporter.RunDaemon()
 	runErr = r.run(ctx, task, reporter)
@@ -264,6 +276,10 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 	}
 
 	return execErr
+}
+
+func (r *Runner) RunningCount() int64 {
+	return r.runningCount.Load()
 }
 
 func (r *Runner) Declare(ctx context.Context, labels []string) (*connect.Response[runnerv1.DeclareResponse], error) {

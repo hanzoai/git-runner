@@ -27,6 +27,7 @@ import (
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/envcheck"
 	"gitea.com/gitea/act_runner/internal/pkg/labels"
+	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 	"gitea.com/gitea/act_runner/internal/pkg/ver"
 )
 
@@ -147,6 +148,15 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 		} else {
 			log.Infof("runner: %s, with version: %s, with labels: %v, declare successfully",
 				resp.Msg.Runner.Name, resp.Msg.Runner.Version, resp.Msg.Runner.Labels)
+		}
+
+		if cfg.Metrics.Enabled {
+			metrics.Init()
+			metrics.RunnerInfo.WithLabelValues(ver.Version(), resp.Msg.Runner.Name).Set(1)
+			metrics.RunnerCapacity.Set(float64(cfg.Runner.Capacity))
+			metrics.RegisterUptimeFunc(time.Now())
+			metrics.RegisterRunningJobsFunc(runner.RunningCount, cfg.Runner.Capacity)
+			metrics.StartServer(ctx, cfg.Metrics.Addr)
 		}
 
 		poller := poll.New(cfg, cli, runner)

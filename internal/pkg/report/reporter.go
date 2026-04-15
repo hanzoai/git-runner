@@ -21,6 +21,7 @@ import (
 
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 )
 
 type Reporter struct {
@@ -35,6 +36,11 @@ type Reporter struct {
 	logRows     []*runnerv1.LogRow
 	logReplacer *strings.Replacer
 	oldnew      []string
+
+	// lastLogBufferRows is the last value written to the ReportLogBufferRows
+	// gauge; guarded by clientM (the same lock held around each ReportLog call)
+	// so the gauge skips no-op Set calls when the buffer size is unchanged.
+	lastLogBufferRows int
 
 	state        *runnerv1.TaskState
 	stateChanged bool
@@ -91,6 +97,13 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 	}
 
 	return rv
+}
+
+// Result returns the final job result. Safe to call after Close() returns.
+func (r *Reporter) Result() runnerv1.Result {
+	r.stateMu.RLock()
+	defer r.stateMu.RUnlock()
+	return r.state.Result
 }
 
 func (r *Reporter) ResetSteps(l int) {
@@ -421,15 +434,20 @@ func (r *Reporter) ReportLog(noMore bool) error {
 		return nil
 	}
 
+	start := time.Now()
 	resp, err := r.client.UpdateLog(r.ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 		TaskId: r.state.Id,
 		Index:  int64(r.logOffset),
 		Rows:   rows,
 		NoMore: noMore,
 	}))
+	metrics.ReportLogDuration.Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultError).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodUpdateLog).Inc()
 		return err
 	}
+	metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
 
 	ack := int(resp.Msg.AckIndex)
 	if ack < r.logOffset {
@@ -440,7 +458,12 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	r.logRows = r.logRows[ack-r.logOffset:]
 	submitted := r.logOffset + len(rows)
 	r.logOffset = ack
+	remaining := len(r.logRows)
 	r.stateMu.Unlock()
+	if remaining != r.lastLogBufferRows {
+		metrics.ReportLogBufferRows.Set(float64(remaining))
+		r.lastLogBufferRows = remaining
+	}
 
 	if noMore && ack < submitted {
 		return errors.New("not all logs are submitted")
@@ -479,16 +502,21 @@ func (r *Reporter) ReportState(reportResult bool) error {
 		state.Result = runnerv1.Result_RESULT_UNSPECIFIED
 	}
 
+	start := time.Now()
 	resp, err := r.client.UpdateTask(r.ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 		State:   state,
 		Outputs: outputs,
 	}))
+	metrics.ReportStateDuration.Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultError).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodUpdateTask).Inc()
 		r.stateMu.Lock()
 		r.stateChanged = true
 		r.stateMu.Unlock()
 		return err
 	}
+	metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
 
 	for _, k := range resp.Msg.SentOutputs {
 		r.outputs.Store(k, struct{}{})

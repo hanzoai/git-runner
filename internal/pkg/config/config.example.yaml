@@ -132,3 +132,12 @@ host:
   # The parent directory of a job's working directory.
   # If it's empty, $HOME/.cache/act/ will be used.
   workdir_parent:
+
+metrics:
+  # Enable the Prometheus metrics endpoint.
+  # When enabled, metrics are served at http://<addr>/metrics and a liveness check at /healthz.
+  enabled: false
+  # The address for the metrics HTTP server to listen on.
+  # Defaults to localhost only. Set to ":9101" to allow external access,
+  # but ensure the port is firewall-protected as there is no authentication.
+  addr: "127.0.0.1:9101"
