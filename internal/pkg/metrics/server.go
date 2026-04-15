@@ -1,7 +1,7 @@
 // Copyright 2026 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-package metrics //nolint:revive // "metrics" is the conventional package name for Prometheus instrumentation; runtime/metrics stdlib is not used here.
+package metrics
 
 import (
 	"context"
