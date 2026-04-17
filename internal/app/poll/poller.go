@@ -12,14 +12,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"connectrpc.com/connect"
-	log "github.com/sirupsen/logrus"
-
 	"gitea.com/gitea/act_runner/internal/app/run"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/metrics"
+
+	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	"connectrpc.com/connect"
+	log "github.com/sirupsen/logrus"
 )
 
 type Poller struct {

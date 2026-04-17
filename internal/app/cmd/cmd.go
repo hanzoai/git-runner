@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/ver"
+
+	"github.com/spf13/cobra"
 )
 
 func Execute(ctx context.Context) {

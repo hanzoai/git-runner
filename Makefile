@@ -1,6 +1,5 @@
 DIST := dist
 EXECUTABLE := act_runner
-GOFMT ?= gofumpt -l
 DIST_DIRS := $(DIST)/binaries $(DIST)/release
 GO ?= go
 SHASUM ?= shasum -a 256
@@ -12,7 +11,6 @@ GXZ_PAGAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
-GO_FMT_FILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
 GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
 
 DOCKER_IMAGE ?= gitea/act_runner
@@ -68,19 +66,14 @@ else
 	endif
 endif
 
-GO_PACKAGES_TO_VET ?= $(filter-out gitea.com/gitea/act_runner/internal/pkg/client/mocks,$(shell $(GO) list ./...))
-
-
 TAGS ?=
 LDFLAGS ?= -X "gitea.com/gitea/act_runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
 
 all: build
 
+.PHONY: fmt
 fmt:
-	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) install mvdan.cc/gofumpt@latest; \
-	fi
-	$(GOFMT) -w $(GO_FMT_FILES)
+	$(GO) run $(GOLANGCI_LINT_PACKAGE) fmt
 
 .PHONY: go-check
 go-check:
@@ -93,23 +86,20 @@ go-check:
 	fi
 
 .PHONY: fmt-check
-fmt-check:
-	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
-		$(GO) install mvdan.cc/gofumpt@latest; \
-	fi
-	@diff=$$($(GOFMT) -d $(GO_FMT_FILES)); \
+fmt-check: fmt
+	@diff=$$(git diff --color=always); \
 	if [ -n "$$diff" ]; then \
 		echo "Please run 'make fmt' and commit the result:"; \
-		echo "$${diff}"; \
+		printf "%s" "$${diff}"; \
 		exit 1; \
-	fi;
+	fi
 
 .PHONY: deps-tools
 deps-tools: ## install tool dependencies
 	$(GO) install $(GOVULNCHECK_PACKAGE)
 
 .PHONY: lint
-lint: lint-go vet
+lint: lint-go
 
 .PHONY: lint-go
 lint-go: ## lint go files
@@ -138,12 +128,6 @@ tidy-check: tidy
 
 test: fmt-check security-check
 	@$(GO) test -race -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
-
-.PHONY: vet
-vet:
-	@echo "Running go vet..."
-	@$(GO) build code.gitea.io/gitea-vet
-	@$(GO) vet -vettool=gitea-vet $(GO_PACKAGES_TO_VET)
 
 install: $(GOFILES)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'

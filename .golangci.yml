@@ -13,6 +13,7 @@ linters:
     - forbidigo
     - gocheckcompilerdirectives
     - gocritic
+    - goheader
     - govet
     - ineffassign
     - mirror
@@ -85,6 +86,11 @@ linters:
       enable:
         - nilness
         - unusedwrite
+    goheader:
+      values:
+        regexp:
+          HEADER: 'Copyright \d{4} The Gitea Authors\. All rights reserved\.(\nCopyright [^\n]+)*\nSPDX-License-Identifier: MIT'
+      template: '{{ HEADER }}'
   exclusions:
     generated: lax
     presets:
@@ -101,9 +107,16 @@ issues:
   max-same-issues: 0
 formatters:
   enable:
-    - gofmt
+    - gci
     - gofumpt
   settings:
+    gci:
+      custom-order: true
+      sections:
+        - standard
+        - prefix(gitea.com/gitea/act_runner)
+        - blank
+        - default
     gofumpt:
       extra-rules: true
   exclusions:

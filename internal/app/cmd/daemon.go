@@ -16,11 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
-	"github.com/mattn/go-isatty"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-
 	"gitea.com/gitea/act_runner/internal/app/poll"
 	"gitea.com/gitea/act_runner/internal/app/run"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
@@ -29,6 +24,11 @@ import (
 	"gitea.com/gitea/act_runner/internal/pkg/labels"
 	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 	"gitea.com/gitea/act_runner/internal/pkg/ver"
+
+	"connectrpc.com/connect"
+	"github.com/mattn/go-isatty"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) func(cmd *cobra.Command, args []string) error {

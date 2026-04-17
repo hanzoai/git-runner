@@ -12,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	connect_go "connectrpc.com/connect"
 	log "github.com/sirupsen/logrus"
@@ -20,9 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
 )
 
 func TestReporter_parseLogRow(t *testing.T) {

@@ -14,17 +14,17 @@ import (
 	"strings"
 	"time"
 
+	"gitea.com/gitea/act_runner/internal/pkg/client"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/labels"
+	"gitea.com/gitea/act_runner/internal/pkg/ver"
+
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"connectrpc.com/connect"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
 )
 
 // runRegister registers a runner to the server

@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	connect_go "connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
 )
 
 // TestPoller_PerWorkerCounters verifies that each worker maintains its own

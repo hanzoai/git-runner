@@ -12,16 +12,16 @@ import (
 	"sync"
 	"time"
 
+	"gitea.com/gitea/act_runner/internal/pkg/client"
+	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"gitea.com/gitea/act_runner/internal/pkg/metrics"
+
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"connectrpc.com/connect"
 	"github.com/avast/retry-go/v4"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/metrics"
 )
 
 type Reporter struct {

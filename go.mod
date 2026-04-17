@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	code.gitea.io/actions-proto-go v0.4.1
-	code.gitea.io/gitea-vet v0.2.3
 	connectrpc.com/connect v1.19.1
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/docker/docker v25.0.13+incompatible
@@ -110,7 +109,6 @@ require (
 	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
