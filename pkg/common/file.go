@@ -7,7 +7,7 @@ import (
 )
 
 // CopyFile copy file
-func CopyFile(source string, dest string) (err error) {
+func CopyFile(source, dest string) (err error) {
 	sourcefile, err := os.Open(source)
 	if err != nil {
 		return err
@@ -30,11 +30,11 @@ func CopyFile(source string, dest string) (err error) {
 		}
 	}
 
-	return
+	return err
 }
 
 // CopyDir recursive copy of directory
-func CopyDir(source string, dest string) (err error) {
+func CopyDir(source, dest string) (err error) {
 	// get properties of source dir
 	sourceinfo, err := os.Stat(source)
 	if err != nil {

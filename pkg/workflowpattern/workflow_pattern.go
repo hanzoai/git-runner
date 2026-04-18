@@ -34,7 +34,7 @@ func CompilePattern(rawpattern string) (*WorkflowPattern, error) {
 	}, nil
 }
 
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func PatternToRegex(pattern string) (string, error) {
 	var rpattern strings.Builder
 	rpattern.WriteString("^")
@@ -127,7 +127,7 @@ func PatternToRegex(pattern string) (string, error) {
 			if errorMessage.Len() > 0 {
 				errorMessage.WriteString(", ")
 			}
-			errorMessage.WriteString(fmt.Sprintf("Position: %d Error: %s", position, err))
+			fmt.Fprintf(&errorMessage, "Position: %d Error: %s", position, err)
 		}
 		return "", fmt.Errorf("invalid Pattern '%s': %s", pattern, errorMessage.String())
 	}

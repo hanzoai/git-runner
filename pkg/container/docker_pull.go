@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/distribution/reference"
+	"github.com/nektos/act/pkg/common"
+
+	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/registry"
-
-	"github.com/nektos/act/pkg/common"
 )
 
 // NewDockerPullExecutor function to create a run executor for the container

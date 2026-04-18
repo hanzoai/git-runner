@@ -29,7 +29,7 @@ func tryParseRawActionCommand(line string) (command string, kvPairs map[string]s
 		arg = m[4]
 		ok = true
 	}
-	return
+	return command, kvPairs, arg, ok
 }
 
 func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
@@ -135,10 +135,10 @@ func (rc *RunContext) addPath(ctx context.Context, arg string) {
 	rc.ExtraPath = extraPath
 }
 
-func parseKeyValuePairs(kvPairs string, separator string) map[string]string {
+func parseKeyValuePairs(kvPairs, separator string) map[string]string {
 	rtn := make(map[string]string)
-	kvPairList := strings.Split(kvPairs, separator)
-	for _, kvPair := range kvPairList {
+	kvPairList := strings.SplitSeq(kvPairs, separator)
+	for kvPair := range kvPairList {
 		kv := strings.Split(kvPair, "=")
 		if len(kv) == 2 {
 			rtn[kv[0]] = kv[1]

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/docker/cli/cli/config"
-
 	log "github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/assert"
 )

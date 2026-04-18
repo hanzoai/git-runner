@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nektos/act/pkg/common"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -18,8 +20,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/nektos/act/pkg/common"
 )
 
 var (
@@ -52,7 +52,7 @@ func (e *Error) Commit() string {
 }
 
 // FindGitRevision get the current git revision
-func FindGitRevision(ctx context.Context, file string) (shortSha string, sha string, err error) {
+func FindGitRevision(ctx context.Context, file string) (shortSha, sha string, err error) {
 	logger := common.Logger(ctx)
 
 	gitDir, err := git.PlainOpenWithOptions(
@@ -62,7 +62,6 @@ func FindGitRevision(ctx context.Context, file string) (shortSha string, sha str
 			EnableDotGitCommonDir: true,
 		},
 	)
-
 	if err != nil {
 		logger.WithError(err).Error("path", file, "not located inside a git repository")
 		return "", "", err
@@ -74,7 +73,7 @@ func FindGitRevision(ctx context.Context, file string) (shortSha string, sha str
 	}
 
 	if head.Hash().IsZero() {
-		return "", "", fmt.Errorf("HEAD sha1 could not be resolved")
+		return "", "", errors.New("HEAD sha1 could not be resolved")
 	}
 
 	hash := head.Hash().String()
@@ -96,8 +95,8 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 	logger.Debugf("HEAD points to '%s'", ref)
 
 	// Prefer the git library to iterate over the references and find a matching tag or branch.
-	var refTag = ""
-	var refBranch = ""
+	refTag := ""
+	refBranch := ""
 	repo, err := git.PlainOpenWithOptions(
 		file,
 		&git.PlainOpenOptions{
@@ -105,7 +104,6 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 			EnableDotGitCommonDir: true,
 		},
 	)
-
 	if err != nil {
 		return "", err
 	}
@@ -144,7 +142,6 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +195,7 @@ func findGitRemoteURL(_ context.Context, file, remoteName string) (string, error
 	return remote.Config().URLs[0], nil
 }
 
-func findGitSlug(url string, githubInstance string) (string, string, error) {
+func findGitSlug(url, githubInstance string) (string, string, error) {
 	if matches := codeCommitHTTPRegex.FindStringSubmatch(url); matches != nil {
 		return "CodeCommit", matches[2], nil
 	} else if matches := codeCommitSSHRegex.FindStringSubmatch(url); matches != nil {
@@ -209,7 +206,7 @@ func findGitSlug(url string, githubInstance string) (string, string, error) {
 		return "GitHub", fmt.Sprintf("%s/%s", matches[1], matches[2]), nil
 	} else if githubInstance != "github.com" {
 		gheHTTPRegex := regexp.MustCompile(fmt.Sprintf(`^https?://%s/(.+)/(.+?)(?:.git)?$`, githubInstance))
-		gheSSHRegex := regexp.MustCompile(fmt.Sprintf(`%s[:/](.+)/(.+?)(?:.git)?$`, githubInstance))
+		gheSSHRegex := regexp.MustCompile(githubInstance + "[:/](.+)/(.+?)(?:.git)?$")
 		if matches := gheHTTPRegex.FindStringSubmatch(url); matches != nil {
 			return "GitHubEnterprise", fmt.Sprintf("%s/%s", matches[1], matches[2]), nil
 		} else if matches := gheSSHRegex.FindStringSubmatch(url); matches != nil {
@@ -292,7 +289,7 @@ func gitOptions(token string) (fetchOptions git.FetchOptions, pullOptions git.Pu
 
 // NewGitCloneExecutor creates an executor to clone git repos
 //
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func NewGitCloneExecutor(input NewGitCloneExecutorInput) common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
@@ -302,7 +299,7 @@ func NewGitCloneExecutor(input NewGitCloneExecutorInput) common.Executor {
 		cloneLock.Lock()
 		defer cloneLock.Unlock()
 
-		refName := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", input.Ref))
+		refName := plumbing.ReferenceName("refs/heads/" + input.Ref)
 		r, err := CloneIfRequired(ctx, refName, input, logger)
 		if err != nil {
 			return err

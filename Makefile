@@ -13,6 +13,8 @@ endif
 
 ACT ?= go run main.go
 
+GOLANGCI_LINT_PACKAGE ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+
 HAS_TOKEN = $(if $(test -e ~/.config/github/token),true,false)
 ifeq (true,$(HAS_TOKEN))
 	export GITHUB_TOKEN := $(shell cat ~/.config/github/token)
@@ -27,11 +29,19 @@ build:
 
 .PHONY: format
 format:
-	go fmt ./...
+	go run $(GOLANGCI_LINT_PACKAGE) fmt
+
+.PHONY: format-check
+format-check: format
+	@diff=$$(git diff --color=always); \
+	if [ -n "$$diff" ]; then \
+		echo "Please run 'make format' and commit the result:"; \
+		printf "%s" "$${diff}"; \
+		exit 1; \
+	fi
 
 .PHONY: format-all
-format-all:
-	go fmt ./...
+format-all: format
 	npx prettier --write .
 
 .PHONY: test
@@ -41,7 +51,7 @@ test:
 
 .PHONY: lint-go
 lint-go:
-	golangci-lint run $(FIX)
+	go run $(GOLANGCI_LINT_PACKAGE) run $(FIX)
 
 .PHONY: lint-js
 lint-js:

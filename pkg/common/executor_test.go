@@ -2,7 +2,7 @@ package common
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -19,7 +19,7 @@ func TestNewWorkflow(t *testing.T) {
 	assert.Nil(emptyWorkflow(ctx))
 
 	// error case
-	errorWorkflow := NewErrorExecutor(fmt.Errorf("test error"))
+	errorWorkflow := NewErrorExecutor(errors.New("test error"))
 	assert.NotNil(errorWorkflow(ctx))
 
 	// multiple success case
@@ -122,7 +122,7 @@ func TestNewParallelExecutorFailed(t *testing.T) {
 	count := 0
 	errorWorkflow := NewPipelineExecutor(func(ctx context.Context) error {
 		count++
-		return fmt.Errorf("fake error")
+		return errors.New("fake error")
 	})
 	err := NewParallelExecutor(1, errorWorkflow)(ctx)
 	assert.Equal(1, count)
@@ -135,7 +135,7 @@ func TestNewParallelExecutorCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	errExpected := fmt.Errorf("fake error")
+	errExpected := errors.New("fake error")
 
 	count := 0
 	successWorkflow := NewPipelineExecutor(func(ctx context.Context) error {

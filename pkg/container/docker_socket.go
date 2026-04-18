@@ -43,8 +43,8 @@ func socketLocation() (string, bool) {
 // indicating that the `daemonPath` is a Docker host URI. If it doesn't, or if the "://" delimiter
 // is not found in the `daemonPath`, the function returns false.
 func isDockerHostURI(daemonPath string) bool {
-	if protoIndex := strings.Index(daemonPath, "://"); protoIndex != -1 {
-		scheme := daemonPath[:protoIndex]
+	if before, _, ok := strings.Cut(daemonPath, "://"); ok {
+		scheme := before
 		if strings.IndexFunc(scheme, func(r rune) bool {
 			return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z')
 		}) == -1 {

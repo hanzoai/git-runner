@@ -14,11 +14,11 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kballard/go-shellquote"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/kballard/go-shellquote"
 )
 
 type actionStep interface {
@@ -29,7 +29,7 @@ type actionStep interface {
 	getCompositeSteps() *compositeSteps
 }
 
-type readAction func(ctx context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error)
+type readAction func(ctx context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error)
 
 type actionYamlReader func(filename string) (io.Reader, io.Closer, error)
 
@@ -40,7 +40,7 @@ type runAction func(step actionStep, actionDir string, remoteAction *remoteActio
 //go:embed res/trampoline.js
 var trampoline embed.FS
 
-func readActionImpl(ctx context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
+func readActionImpl(ctx context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
 	logger := common.Logger(ctx)
 	allErrors := []error{}
 	addError := func(fileName string, err error) {
@@ -117,7 +117,7 @@ func readActionImpl(ctx context.Context, step *model.Step, actionDir string, act
 	return action, err
 }
 
-func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir string, actionPath string, containerActionDir string) error {
+func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir, actionPath, containerActionDir string) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
 	stepModel := step.getStepModel()
@@ -207,7 +207,7 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 
 			rc.ApplyExtraPath(ctx, step.getEnv())
 
-			execFileName := fmt.Sprintf("%s.out", action.Runs.Main)
+			execFileName := action.Runs.Main + ".out"
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Main}
 			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
 
@@ -262,8 +262,8 @@ func removeGitIgnore(ctx context.Context, directory string) error {
 
 // TODO: break out parts of function to reduce complexicity
 //
-//nolint:gocyclo
-func execAsDocker(ctx context.Context, step actionStep, actionName string, basedir string, localAction bool) error {
+//nolint:gocyclo // function handles many cases
+func execAsDocker(ctx context.Context, step actionStep, actionName, basedir string, localAction bool) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
 	action := step.getActionModel()
@@ -271,14 +271,14 @@ func execAsDocker(ctx context.Context, step actionStep, actionName string, based
 	var prepImage common.Executor
 	var image string
 	forcePull := false
-	if strings.HasPrefix(action.Runs.Image, "docker://") {
-		image = strings.TrimPrefix(action.Runs.Image, "docker://")
+	if after, ok := strings.CutPrefix(action.Runs.Image, "docker://"); ok {
+		image = after
 		// Apply forcePull only for prebuild docker images
 		forcePull = rc.Config.ForcePull
 	} else {
 		// "-dockeraction" enshures that "./", "./test " won't get converted to "act-:latest", "act-test-:latest" which are invalid docker image names
 		image = fmt.Sprintf("%s-dockeraction:%s", regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(actionName, "-"), "latest")
-		image = fmt.Sprintf("act-%s", strings.TrimLeft(image, "-"))
+		image = "act-" + strings.TrimLeft(image, "-")
 		image = strings.ToLower(image)
 		contextDir, fileName := filepath.Split(filepath.Join(basedir, action.Runs.Image))
 
@@ -391,7 +391,7 @@ func evalDockerArgs(ctx context.Context, step step, action *model.Action, cmd *[
 	}
 }
 
-func newStepContainer(ctx context.Context, step step, image string, cmd []string, entrypoint []string) container.Container {
+func newStepContainer(ctx context.Context, step step, image string, cmd, entrypoint []string) container.Container {
 	rc := step.getRunContext()
 	stepModel := step.getStepModel()
 	rawLogger := common.Logger(ctx).WithField("raw_output", true)
@@ -414,7 +414,7 @@ func newStepContainer(ctx context.Context, step step, image string, cmd []string
 	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TEMP", "/tmp"))
 
 	binds, mounts := rc.GetBindsAndMounts()
-	networkMode := fmt.Sprintf("container:%s", rc.jobContainerName())
+	networkMode := "container:" + rc.jobContainerName()
 	if rc.IsHostEnv(ctx) {
 		networkMode = "default"
 	}
@@ -446,7 +446,7 @@ func populateEnvsFromSavedState(env *map[string]string, step actionStep, rc *Run
 	state, ok := rc.IntraActionState[step.getStepModel().ID]
 	if ok {
 		for name, value := range state {
-			envName := fmt.Sprintf("STATE_%s", name)
+			envName := "STATE_" + name
 			(*env)[envName] = value
 		}
 	}
@@ -456,7 +456,7 @@ func populateEnvsFromInput(ctx context.Context, env *map[string]string, action *
 	eval := rc.NewExpressionEvaluator(ctx)
 	for inputID, input := range action.Inputs {
 		envKey := regexp.MustCompile("[^A-Z0-9-]").ReplaceAllString(strings.ToUpper(inputID), "_")
-		envKey = fmt.Sprintf("INPUT_%s", envKey)
+		envKey = "INPUT_" + envKey
 		if _, ok := (*env)[envKey]; !ok {
 			(*env)[envKey] = eval.Interpolate(ctx, input.Default)
 		}
@@ -543,7 +543,7 @@ func runPreStep(step actionStep) common.Executor {
 				actionPath = ""
 			}
 
-			actionLocation := ""
+			var actionLocation string
 			if actionPath != "" {
 				actionLocation = path.Join(actionDir, actionPath)
 			} else {
@@ -571,7 +571,7 @@ func runPreStep(step actionStep) common.Executor {
 			if steps := step.getCompositeSteps(); steps != nil && steps.pre != nil {
 				return steps.pre(ctx)
 			}
-			return fmt.Errorf("missing steps in composite action")
+			return errors.New("missing steps in composite action")
 
 		case x == model.ActionRunsUsingGo:
 			// defaults in pre steps were missing, however provided inputs are available
@@ -587,7 +587,7 @@ func runPreStep(step actionStep) common.Executor {
 				actionPath = ""
 			}
 
-			actionLocation := ""
+			var actionLocation string
 			if actionPath != "" {
 				actionLocation = path.Join(actionDir, actionPath)
 			} else {
@@ -602,7 +602,7 @@ func runPreStep(step actionStep) common.Executor {
 
 			rc.ApplyExtraPath(ctx, step.getEnv())
 
-			execFileName := fmt.Sprintf("%s.out", action.Runs.Pre)
+			execFileName := action.Runs.Pre + ".out"
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Pre}
 			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
 
@@ -672,7 +672,7 @@ func runPostStep(step actionStep) common.Executor {
 			actionPath = ""
 		}
 
-		actionLocation := ""
+		var actionLocation string
 		if actionPath != "" {
 			actionLocation = path.Join(actionDir, actionPath)
 		} else {
@@ -702,13 +702,13 @@ func runPostStep(step actionStep) common.Executor {
 			if steps := step.getCompositeSteps(); steps != nil && steps.post != nil {
 				return steps.post(ctx)
 			}
-			return fmt.Errorf("missing steps in composite action")
+			return errors.New("missing steps in composite action")
 
 		case x == model.ActionRunsUsingGo:
 			populateEnvsFromSavedState(step.getEnv(), step, rc)
 			rc.ApplyExtraPath(ctx, step.getEnv())
 
-			execFileName := fmt.Sprintf("%s.out", action.Runs.Post)
+			execFileName := action.Runs.Post + ".out"
 			buildArgs := []string{"go", "build", "-o", execFileName, action.Runs.Post}
 			execArgs := []string{filepath.Join(containerActionDir, execFileName)}
 

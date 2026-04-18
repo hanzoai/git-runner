@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/nektos/act/pkg/common"
@@ -10,7 +11,7 @@ import (
 )
 
 type jobInfo interface {
-	matrix() map[string]interface{}
+	matrix() map[string]any
 	steps() []*model.Step
 	startContainer() common.Executor
 	stopContainer() common.Executor
@@ -19,7 +20,7 @@ type jobInfo interface {
 	result(result string)
 }
 
-//nolint:contextcheck,gocyclo
+//nolint:contextcheck,gocyclo // composes many step executors
 func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executor {
 	steps := make([]common.Executor, 0)
 	preSteps := make([]common.Executor, 0)
@@ -54,19 +55,17 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 	})
 
 	for i, stepModel := range infoSteps {
-		stepModel := stepModel
 		if stepModel == nil {
 			return func(ctx context.Context) error {
 				return fmt.Errorf("invalid Step %v: missing run or uses key", i)
 			}
 		}
 		if stepModel.ID == "" {
-			stepModel.ID = fmt.Sprintf("%d", i)
+			stepModel.ID = strconv.Itoa(i)
 		}
 		stepModel.Number = i
 
 		step, err := sf.newStep(stepModel, rc)
-
 		if err != nil {
 			return common.NewErrorExecutor(err)
 		}
@@ -154,7 +153,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 	pipeline = append(pipeline, steps...)
 
 	return common.NewPipelineExecutor(info.startContainer(), common.NewPipelineExecutor(pipeline...).
-		Finally(func(ctx context.Context) error { //nolint:contextcheck
+		Finally(func(ctx context.Context) error { //nolint:contextcheck // intentionally detaches from canceled parent
 			var cancel context.CancelFunc
 			if ctx.Err() == context.Canceled {
 				// in case of an aborted run, we still should execute the

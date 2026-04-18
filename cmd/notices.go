@@ -76,7 +76,7 @@ func getVersionNotices(version string) []Notice {
 	noticeURL.RawQuery = query.Encode()
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", noticeURL.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, noticeURL.String(), nil)
 	if err != nil {
 		log.Debug(err)
 		return nil
@@ -102,7 +102,7 @@ func getVersionNotices(version string) []Notice {
 
 	defer resp.Body.Close()
 	notices := []Notice{}
-	if resp.StatusCode == 304 {
+	if resp.StatusCode == http.StatusNotModified {
 		log.Debug("No new notices")
 		return nil
 	}

@@ -6,8 +6,7 @@ type Env interface {
 	Getenv(name string) string
 }
 
-type defaultEnv struct {
-}
+type defaultEnv struct{}
 
 func (*defaultEnv) Getenv(name string) string {
 	return os.Getenv(name)

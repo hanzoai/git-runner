@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFunctionContains(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"contains('search', 'item') }}", false, "contains-str-str"},
@@ -48,7 +49,7 @@ func TestFunctionContains(t *testing.T) {
 func TestFunctionStartsWith(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"startsWith('search', 'se') }}", true, "startswith-string"},
@@ -77,7 +78,7 @@ func TestFunctionStartsWith(t *testing.T) {
 func TestFunctionEndsWith(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"endsWith('search', 'ch') }}", true, "endsWith-string"},
@@ -106,7 +107,7 @@ func TestFunctionEndsWith(t *testing.T) {
 func TestFunctionJoin(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"join(fromJSON('[\"a\", \"b\"]'), ',')", "a,b", "join-arr"},
@@ -133,7 +134,7 @@ func TestFunctionJoin(t *testing.T) {
 func TestFunctionToJSON(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"toJSON(env) }}", "{\n  \"key\": \"value\"\n}", "toJSON"},
@@ -159,10 +160,10 @@ func TestFunctionToJSON(t *testing.T) {
 func TestFunctionFromJSON(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
-		{"fromJSON('{\"foo\":\"bar\"}') }}", map[string]interface{}{
+		{"fromJSON('{\"foo\":\"bar\"}') }}", map[string]any{
 			"foo": "bar",
 		}, "fromJSON"},
 	}
@@ -182,7 +183,7 @@ func TestFunctionFromJSON(t *testing.T) {
 func TestFunctionHashFiles(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"hashFiles('**/non-extant-files') }}", "", "hash-non-existing-file"},
@@ -212,8 +213,8 @@ func TestFunctionHashFiles(t *testing.T) {
 func TestFunctionFormat(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
-		error    interface{}
+		expected any
+		error    any
 		name     string
 	}{
 		{"format('text')", "text", nil, "format-plain-string"},

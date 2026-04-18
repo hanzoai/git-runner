@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kballard/go-shellquote"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/kballard/go-shellquote"
 )
 
 type stepDocker struct {
@@ -85,11 +86,9 @@ func (sd *stepDocker) runUsesContainer() common.Executor {
 	}
 }
 
-var (
-	ContainerNewContainer = container.NewContainer
-)
+var ContainerNewContainer = container.NewContainer
 
-func (sd *stepDocker) newStepContainer(ctx context.Context, image string, cmd []string, entrypoint []string) container.Container {
+func (sd *stepDocker) newStepContainer(ctx context.Context, image string, cmd, entrypoint []string) container.Container {
 	rc := sd.RunContext
 	step := sd.Step
 
@@ -123,7 +122,7 @@ func (sd *stepDocker) newStepContainer(ctx context.Context, image string, cmd []
 		Name:         createSimpleContainerName(rc.jobContainerName(), "STEP-"+step.ID),
 		Env:          envList,
 		Mounts:       mounts,
-		NetworkMode:  fmt.Sprintf("container:%s", rc.jobContainerName()),
+		NetworkMode:  "container:" + rc.jobContainerName(),
 		Binds:        binds,
 		Stdout:       logWriter,
 		Stderr:       logWriter,

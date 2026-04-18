@@ -46,7 +46,7 @@ func (sal *stepActionLocal) main() common.Executor {
 			_, cpath := getContainerActionPaths(sal.Step, path.Join(actionDir, ""), sal.RunContext)
 			return func(filename string) (io.Reader, io.Closer, error) {
 				spath := path.Join(cpath, filename)
-				for i := 0; i < maxSymlinkDepth; i++ {
+				for range maxSymlinkDepth {
 					tars, err := sal.RunContext.JobContainer.GetContainerArchive(ctx, spath)
 					if errors.Is(err, fs.ErrNotExist) {
 						return nil, nil, err

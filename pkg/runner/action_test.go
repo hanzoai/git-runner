@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -122,7 +123,7 @@ runs:
 
 			writeFile := func(filename string, data []byte, perm fs.FileMode) error {
 				assert.Equal(t, "actionDir/actionPath/trampoline.js", filename)
-				assert.Equal(t, fs.FileMode(0400), perm)
+				assert.Equal(t, fs.FileMode(0o400), perm)
 				return nil
 			}
 

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,9 +14,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
-
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/rhysd/actionlint"
 )
 
@@ -66,7 +67,7 @@ const (
 
 func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.Value) (string, error) {
 	input := impl.coerceToString(str).String()
-	output := ""
+	var output strings.Builder
 	replacementIndex := ""
 
 	state := passThrough
@@ -81,13 +82,13 @@ func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.V
 				state = bracketClose
 
 			default:
-				output += string(character)
+				output.WriteRune(character)
 			}
 
 		case bracketOpen: // found {
 			switch character {
 			case '{':
-				output += "{"
+				output.WriteString("{")
 				replacementIndex = ""
 				state = passThrough
 
@@ -103,7 +104,7 @@ func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.V
 					return "", fmt.Errorf("The following format string references more arguments than were supplied: '%s'", input)
 				}
 
-				output += impl.coerceToString(replaceValue[index]).String()
+				output.WriteString(impl.coerceToString(replaceValue[index]).String())
 
 				state = passThrough
 
@@ -114,7 +115,7 @@ func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.V
 		case bracketClose: // found }
 			switch character {
 			case '}':
-				output += "}"
+				output.WriteString("}")
 				replacementIndex = ""
 				state = passThrough
 
@@ -134,10 +135,10 @@ func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.V
 		}
 	}
 
-	return output, nil
+	return output.String(), nil
 }
 
-func (impl *interperterImpl) join(array reflect.Value, sep reflect.Value) (string, error) {
+func (impl *interperterImpl) join(array, sep reflect.Value) (string, error) {
 	separator := impl.coerceToString(sep).String()
 	switch array.Kind() {
 	case reflect.Slice:
@@ -165,12 +166,12 @@ func (impl *interperterImpl) toJSON(value reflect.Value) (string, error) {
 	return string(json), nil
 }
 
-func (impl *interperterImpl) fromJSON(value reflect.Value) (interface{}, error) {
+func (impl *interperterImpl) fromJSON(value reflect.Value) (any, error) {
 	if value.Kind() != reflect.String {
 		return nil, fmt.Errorf("Cannot parse non-string type %v as JSON", value.Kind())
 	}
 
-	var data interface{}
+	var data any
 
 	err := json.Unmarshal([]byte(value.String()), &data)
 	if err != nil {
@@ -195,7 +196,7 @@ func (impl *interperterImpl) hashFiles(paths ...reflect.Value) (string, error) {
 			}
 			ps = append(ps, gitignore.ParsePattern(cleanPath, nil))
 		} else {
-			return "", fmt.Errorf("Non-string path passed to hashFiles")
+			return "", errors.New("Non-string path passed to hashFiles")
 		}
 	}
 

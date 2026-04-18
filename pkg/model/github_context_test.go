@@ -2,7 +2,7 @@ package model
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -27,19 +27,19 @@ func TestSetRef(t *testing.T) {
 
 	tables := []struct {
 		eventName string
-		event     map[string]interface{}
+		event     map[string]any
 		ref       string
 		refName   string
 	}{
 		{
 			eventName: "pull_request_target",
-			event:     map[string]interface{}{},
+			event:     map[string]any{},
 			ref:       "refs/heads/master",
 			refName:   "master",
 		},
 		{
 			eventName: "pull_request",
-			event: map[string]interface{}{
+			event: map[string]any{
 				"number": 1234.,
 			},
 			ref:     "refs/pull/1234/merge",
@@ -47,8 +47,8 @@ func TestSetRef(t *testing.T) {
 		},
 		{
 			eventName: "deployment",
-			event: map[string]interface{}{
-				"deployment": map[string]interface{}{
+			event: map[string]any{
+				"deployment": map[string]any{
 					"ref": "refs/heads/somebranch",
 				},
 			},
@@ -57,8 +57,8 @@ func TestSetRef(t *testing.T) {
 		},
 		{
 			eventName: "release",
-			event: map[string]interface{}{
-				"release": map[string]interface{}{
+			event: map[string]any{
+				"release": map[string]any{
 					"tag_name": "v1.0.0",
 				},
 			},
@@ -67,7 +67,7 @@ func TestSetRef(t *testing.T) {
 		},
 		{
 			eventName: "push",
-			event: map[string]interface{}{
+			event: map[string]any{
 				"ref": "refs/heads/somebranch",
 			},
 			ref:     "refs/heads/somebranch",
@@ -75,8 +75,8 @@ func TestSetRef(t *testing.T) {
 		},
 		{
 			eventName: "unknown",
-			event: map[string]interface{}{
-				"repository": map[string]interface{}{
+			event: map[string]any{
+				"repository": map[string]any{
 					"default_branch": "main",
 				},
 			},
@@ -85,7 +85,7 @@ func TestSetRef(t *testing.T) {
 		},
 		{
 			eventName: "no-event",
-			event:     map[string]interface{}{},
+			event:     map[string]any{},
 			ref:       "refs/heads/master",
 			refName:   "master",
 		},
@@ -109,12 +109,12 @@ func TestSetRef(t *testing.T) {
 
 	t.Run("no-default-branch", func(t *testing.T) {
 		findGitRef = func(ctx context.Context, file string) (string, error) {
-			return "", fmt.Errorf("no default branch")
+			return "", errors.New("no default branch")
 		}
 
 		ghc := &GithubContext{
 			EventName: "no-default-branch",
-			Event:     map[string]interface{}{},
+			Event:     map[string]any{},
 		}
 
 		ghc.SetRef(context.Background(), "", "/some/dir")
@@ -141,14 +141,14 @@ func TestSetSha(t *testing.T) {
 
 	tables := []struct {
 		eventName string
-		event     map[string]interface{}
+		event     map[string]any
 		sha       string
 	}{
 		{
 			eventName: "pull_request_target",
-			event: map[string]interface{}{
-				"pull_request": map[string]interface{}{
-					"base": map[string]interface{}{
+			event: map[string]any{
+				"pull_request": map[string]any{
+					"base": map[string]any{
 						"sha": "pr-base-sha",
 					},
 				},
@@ -157,15 +157,15 @@ func TestSetSha(t *testing.T) {
 		},
 		{
 			eventName: "pull_request",
-			event: map[string]interface{}{
+			event: map[string]any{
 				"number": 1234.,
 			},
 			sha: "1234fakesha",
 		},
 		{
 			eventName: "deployment",
-			event: map[string]interface{}{
-				"deployment": map[string]interface{}{
+			event: map[string]any{
+				"deployment": map[string]any{
 					"sha": "deployment-sha",
 				},
 			},
@@ -173,12 +173,12 @@ func TestSetSha(t *testing.T) {
 		},
 		{
 			eventName: "release",
-			event:     map[string]interface{}{},
+			event:     map[string]any{},
 			sha:       "1234fakesha",
 		},
 		{
 			eventName: "push",
-			event: map[string]interface{}{
+			event: map[string]any{
 				"after":   "push-sha",
 				"deleted": false,
 			},
@@ -186,12 +186,12 @@ func TestSetSha(t *testing.T) {
 		},
 		{
 			eventName: "unknown",
-			event:     map[string]interface{}{},
+			event:     map[string]any{},
 			sha:       "1234fakesha",
 		},
 		{
 			eventName: "no-event",
-			event:     map[string]interface{}{},
+			event:     map[string]any{},
 			sha:       "1234fakesha",
 		},
 	}

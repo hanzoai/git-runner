@@ -11,7 +11,7 @@ import (
 // ActionRunsUsing is the type of runner for the action
 type ActionRunsUsing string
 
-func (a *ActionRunsUsing) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *ActionRunsUsing) UnmarshalYAML(unmarshal func(any) error) error {
 	var using string
 	if err := unmarshal(&using); err != nil {
 		return err

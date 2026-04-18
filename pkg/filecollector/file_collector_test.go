@@ -27,7 +27,7 @@ func (mfs *memoryFs) walk(root string, fn filepath.WalkFunc) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < len(dir); i++ {
+	for i := range dir {
 		filename := filepath.Join(root, dir[i].Name())
 		err = fn(filename, dir[i], nil)
 		if dir[i].IsDir() {

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -81,7 +81,7 @@ func (m *mockDockerClient) ContainerExecInspect(ctx context.Context, execID stri
 	return args.Get(0).(types.ContainerExecInspect), args.Error(1)
 }
 
-func (m *mockDockerClient) CopyToContainer(ctx context.Context, id string, path string, content io.Reader, options types.CopyToContainerOptions) error {
+func (m *mockDockerClient) CopyToContainer(ctx context.Context, id, path string, content io.Reader, options types.CopyToContainerOptions) error {
 	args := m.Called(ctx, id, path, content, options)
 	return args.Error(0)
 }
@@ -203,7 +203,7 @@ func TestDockerCopyTarStreamErrorInCopyFiles(t *testing.T) {
 
 	conn := &mockConn{}
 
-	merr := fmt.Errorf("Failure")
+	merr := errors.New("Failure")
 
 	client := &mockDockerClient{}
 	client.On("CopyToContainer", ctx, "123", "/", mock.Anything, mock.AnythingOfType("types.CopyToContainerOptions")).Return(merr)
@@ -228,7 +228,7 @@ func TestDockerCopyTarStreamErrorInMkdir(t *testing.T) {
 
 	conn := &mockConn{}
 
-	merr := fmt.Errorf("Failure")
+	merr := errors.New("Failure")
 
 	client := &mockDockerClient{}
 	client.On("CopyToContainer", ctx, "123", "/", mock.Anything, mock.AnythingOfType("types.CopyToContainerOptions")).Return(nil)

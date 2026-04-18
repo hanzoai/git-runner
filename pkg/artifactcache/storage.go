@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 type Storage struct {
@@ -103,11 +104,11 @@ func (s *Storage) Remove(id uint64) {
 }
 
 func (s *Storage) filename(id uint64) string {
-	return filepath.Join(s.rootDir, fmt.Sprintf("%02x", id%0xff), fmt.Sprint(id))
+	return filepath.Join(s.rootDir, fmt.Sprintf("%02x", id%0xff), strconv.FormatUint(id, 10))
 }
 
 func (s *Storage) tempDir(id uint64) string {
-	return filepath.Join(s.rootDir, "tmp", fmt.Sprint(id))
+	return filepath.Join(s.rootDir, "tmp", strconv.FormatUint(id, 10))
 }
 
 func (s *Storage) tempName(id uint64, offset int64) string {

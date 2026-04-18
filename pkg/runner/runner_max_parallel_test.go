@@ -90,14 +90,12 @@ func TestMaxParallelConcurrencyTracking(t *testing.T) {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, 2) // Limit to 2 concurrent
 
-	for i := 0; i < 6; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 6 {
+		wg.Go(func() {
 			semaphore <- struct{}{}        // Acquire
 			defer func() { <-semaphore }() // Release
 			trackingFunc()
-		}()
+		})
 	}
 
 	wg.Wait()

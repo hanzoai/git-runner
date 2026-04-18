@@ -20,7 +20,7 @@ import (
 
 func TestRunContext_EvalBool(t *testing.T) {
 	var yml yaml.Node
-	err := yml.Encode(map[string][]interface{}{
+	err := yml.Encode(map[string][]any{
 		"os":  {"Linux", "Windows"},
 		"foo": {"bar", "baz"},
 	})
@@ -48,7 +48,7 @@ func TestRunContext_EvalBool(t *testing.T) {
 				},
 			},
 		},
-		Matrix: map[string]interface{}{
+		Matrix: map[string]any{
 			"os":  "Linux",
 			"foo": "bar",
 		},
@@ -154,7 +154,6 @@ func TestRunContext_EvalBool(t *testing.T) {
 
 	updateTestIfWorkflow(t, tables, rc)
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			b, err := EvalBool(context.Background(), rc.ExprEval, table.in, exprparser.DefaultStatusCheckSuccess)
@@ -171,18 +170,20 @@ func updateTestIfWorkflow(t *testing.T, tables []struct {
 	in      string
 	out     bool
 	wantErr bool
-}, rc *RunContext) {
-	var envs string
+}, rc *RunContext,
+) {
+	var envs strings.Builder
 	keys := make([]string, 0, len(rc.Env))
 	for k := range rc.Env {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		envs += fmt.Sprintf("  %s: %s\n", k, rc.Env[k])
+		envs.WriteString(fmt.Sprintf("  %s: %s\n", k, rc.Env[k]))
 	}
 	// editorconfig-checker-disable
-	workflow := fmt.Sprintf(`
+	var workflow strings.Builder
+	workflow.WriteString(fmt.Sprintf(`
 name: "Test what expressions result in true and false on GitHub"
 on: push
 
@@ -193,7 +194,7 @@ jobs:
   test-ifs-and-buts:
     runs-on: ubuntu-latest
     steps:
-`, envs)
+`, envs.String()))
 	// editorconfig-checker-enable
 
 	for i, table := range tables {
@@ -211,9 +212,9 @@ jobs:
 			echo = `run: echo OK`
 			name = fmt.Sprintf(`"✅ I should run, expr: %s"`, expr)
 		}
-		workflow += fmt.Sprintf("\n      - name: %s\n        id: step%d\n        if: %s\n        %s\n", name, i, table.in, echo)
+		workflow.WriteString(fmt.Sprintf("\n      - name: %s\n        id: step%d\n        if: %s\n        %s\n", name, i, table.in, echo))
 		if table.out {
-			workflow += fmt.Sprintf("\n      - name: \"Double checking expr: %s\"\n        if: steps.step%d.conclusion == 'skipped'\n        run: echo \"%s should have been true, but wasn't\"\n", expr, i, table.in)
+			workflow.WriteString(fmt.Sprintf("\n      - name: \"Double checking expr: %s\"\n        if: steps.step%d.conclusion == 'skipped'\n        run: echo \"%s should have been true, but wasn't\"\n", expr, i, table.in))
 		}
 	}
 
@@ -222,7 +223,7 @@ jobs:
 		t.Fatal(err)
 	}
 
-	_, err = file.WriteString(workflow)
+	_, err = file.WriteString(workflow.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,10 +260,8 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 
 	for _, testcase := range tests {
 		// pin for scopelint
-		testcase := testcase
 		for _, bindWorkDir := range []bool{true, false} {
 			// pin for scopelint
-			bindWorkDir := bindWorkDir
 			testBindSuffix := ""
 			if bindWorkDir {
 				testBindSuffix = "Bind"
@@ -359,7 +358,7 @@ func TestGetGitHubContext(t *testing.T) {
 		},
 		Name:           "GitHubContextTest",
 		CurrentStep:    "step",
-		Matrix:         map[string]interface{}{},
+		Matrix:         map[string]any{},
 		Env:            map[string]string{},
 		ExtraPath:      []string{},
 		StepResults:    map[string]*model.StepResult{},
@@ -417,7 +416,6 @@ func TestGetGithubContextRef(t *testing.T) {
 	}
 
 	for _, data := range table {
-		data := data
 		t.Run(data.event, func(t *testing.T) {
 			rc := &RunContext{
 				EventJSON: data.json,
@@ -461,7 +459,7 @@ func createIfTestRunContext(jobs map[string]*model.Job) *RunContext {
 	return rc
 }
 
-func createJob(t *testing.T, input string, result string) *model.Job {
+func createJob(t *testing.T, input, result string) *model.Job {
 	var job *model.Job
 	err := yaml.Unmarshal([]byte(input), &job)
 	assert.NoError(t, err)

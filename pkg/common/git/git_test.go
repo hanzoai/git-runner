@@ -17,7 +17,7 @@ import (
 func TestFindGitSlug(t *testing.T) {
 	assert := assert.New(t)
 
-	var slugTests = []struct {
+	slugTests := []struct {
 		url      string // input
 		provider string // expected result
 		slug     string // expected result
@@ -44,10 +44,7 @@ func TestFindGitSlug(t *testing.T) {
 }
 
 func testDir(t *testing.T) string {
-	basedir, err := os.MkdirTemp("", "act-test")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(basedir) })
-	return basedir
+	return t.TempDir()
 }
 
 func cleanGitHooks(dir string) error {
@@ -163,8 +160,6 @@ func TestGitFindRef(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
-		name := name
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(basedir, name)
 			require.NoError(t, os.MkdirAll(dir, 0o755))

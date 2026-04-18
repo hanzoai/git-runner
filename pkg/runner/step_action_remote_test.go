@@ -10,20 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"go.yaml.in/yaml/v4"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/common/git"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"go.yaml.in/yaml/v4"
 )
 
 type stepActionRemoteMocks struct {
 	mock.Mock
 }
 
-func (sarm *stepActionRemoteMocks) readAction(_ context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
+func (sarm *stepActionRemoteMocks) readAction(_ context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
 	args := sarm.Called(step, actionDir, actionPath, readFile, writeFile)
 	return args.Get(0).(*model.Action), args.Error(1)
 }
@@ -162,7 +162,7 @@ func TestStepActionRemote(t *testing.T) {
 			}
 			sar.RunContext.ExprEval = sar.RunContext.NewExpressionEvaluator(ctx)
 
-			suffixMatcher := func(suffix string) interface{} {
+			suffixMatcher := func(suffix string) any {
 				return mock.MatchedBy(func(actionDir string) bool {
 					return strings.HasSuffix(actionDir, suffix)
 				})
@@ -258,7 +258,7 @@ func TestStepActionRemotePre(t *testing.T) {
 				readAction: sarm.readAction,
 			}
 
-			suffixMatcher := func(suffix string) interface{} {
+			suffixMatcher := func(suffix string) any {
 				return mock.MatchedBy(func(actionDir string) bool {
 					return strings.HasSuffix(actionDir, suffix)
 				})
@@ -329,7 +329,7 @@ func TestStepActionRemotePreThroughAction(t *testing.T) {
 				readAction: sarm.readAction,
 			}
 
-			suffixMatcher := func(suffix string) interface{} {
+			suffixMatcher := func(suffix string) any {
 				return mock.MatchedBy(func(actionDir string) bool {
 					return strings.HasSuffix(actionDir, suffix)
 				})
@@ -405,7 +405,7 @@ func TestStepActionRemotePreThroughActionToken(t *testing.T) {
 				readAction: sarm.readAction,
 			}
 
-			suffixMatcher := func(suffix string) interface{} {
+			suffixMatcher := func(suffix string) any {
 				return mock.MatchedBy(func(actionDir string) bool {
 					return strings.HasSuffix(actionDir, suffix)
 				})

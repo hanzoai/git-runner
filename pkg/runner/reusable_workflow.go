@@ -94,7 +94,7 @@ func newActionCacheReusableWorkflowExecutor(rc *RunContext, filename string, rem
 		if err != nil {
 			return err
 		}
-		archive, err := rc.Config.ActionCache.GetTarArchive(ctx, filename, sha, fmt.Sprintf(".github/workflows/%s", remoteReusableWorkflow.Filename))
+		archive, err := rc.Config.ActionCache.GetTarArchive(ctx, filename, sha, ".github/workflows/"+remoteReusableWorkflow.Filename)
 		if err != nil {
 			return err
 		}
@@ -121,9 +121,7 @@ func newActionCacheReusableWorkflowExecutor(rc *RunContext, filename string, rem
 	}
 }
 
-var (
-	executorLock sync.Mutex
-)
+var executorLock sync.Mutex
 
 func newMutexExecutor(executor common.Executor) common.Executor {
 	return func(ctx context.Context) error {
@@ -160,7 +158,7 @@ func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkfl
 	)
 }
 
-func newReusableWorkflowExecutor(rc *RunContext, directory string, workflow string) common.Executor {
+func newReusableWorkflowExecutor(rc *RunContext, directory, workflow string) common.Executor {
 	return func(ctx context.Context) error {
 		planner, err := model.NewWorkflowPlanner(path.Join(directory, workflow), true)
 		if err != nil {
@@ -257,24 +255,6 @@ func newRemoteReusableWorkflowFromAbsoluteURL(uses string) *remoteReusableWorkfl
 		GitPlatform: matches[4],
 		Filename:    matches[5],
 		Ref:         matches[6],
-	}
-}
-
-// deprecated: use newRemoteReusableWorkflowWithPlat
-func newRemoteReusableWorkflow(uses string) *remoteReusableWorkflow {
-	// GitHub docs:
-	// https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_iduses
-	r := regexp.MustCompile(`^([^/]+)/([^/]+)/.github/workflows/([^@]+)@(.*)$`)
-	matches := r.FindStringSubmatch(uses)
-	if len(matches) != 5 {
-		return nil
-	}
-	return &remoteReusableWorkflow{
-		Org:      matches[1],
-		Repo:     matches[2],
-		Filename: matches[3],
-		Ref:      matches[4],
-		URL:      "https://github.com",
 	}
 }
 

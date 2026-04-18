@@ -7,7 +7,7 @@
 // See DOCKER_LICENSE for the full license text.
 //
 
-//nolint:unparam,errcheck,depguard,deadcode,unused
+//nolint:unparam,errcheck,depguard,unused // verbatim copy from docker/cli with minimal changes
 package container
 
 import (
@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,9 +38,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var (
-	deviceCgroupRuleRegexp = regexp.MustCompile(`^[acb] ([0-9]+|\*):([0-9]+|\*) [rwm]{1,3}$`)
-)
+var deviceCgroupRuleRegexp = regexp.MustCompile(`^[acb] ([0-9]+|\*):([0-9]+|\*) [rwm]{1,3}$`)
 
 // containerOptions is a data object with all the options for creating a container
 type containerOptions struct {
@@ -322,7 +321,7 @@ type containerConfig struct {
 // a HostConfig and returns them with the specified command.
 // If the specified args are not valid, it will return an error.
 //
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func parse(flags *pflag.FlagSet, copts *containerOptions, serverOS string) (*containerConfig, error) {
 	var (
 		attachStdin  = copts.attach.Get("stdin")
@@ -559,7 +558,7 @@ func parse(flags *pflag.FlagSet, copts *containerOptions, serverOS string) (*con
 			return nil, errors.Errorf("--health-retries cannot be negative")
 		}
 		if copts.healthStartPeriod < 0 {
-			return nil, fmt.Errorf("--health-start-period cannot be negative")
+			return nil, errors.New("--health-start-period cannot be negative")
 		}
 
 		healthConfig = &container.HealthConfig{
@@ -722,7 +721,6 @@ func parseNetworkOpts(copts *containerOptions) (map[string]*networktypes.Endpoin
 	)
 
 	for i, n := range copts.netMode.Value() {
-		n := n
 		if container.NetworkMode(n.Target).IsUserDefined() {
 			hasUserDefined = true
 		} else {
@@ -837,7 +835,7 @@ func convertToStandardNotation(ports []string) ([]string, error) {
 	for _, publish := range ports {
 		if strings.Contains(publish, "=") {
 			params := map[string]string{"protocol": "tcp"}
-			for _, param := range strings.Split(publish, ",") {
+			for param := range strings.SplitSeq(publish, ",") {
 				opt := strings.Split(param, "=")
 				if len(opt) < 2 {
 					return optsList, errors.Errorf("invalid publish opts format (should be name=value but got '%s')", param)
@@ -988,7 +986,7 @@ func validateDeviceCgroupRule(val string) (string, error) {
 // validDeviceMode checks if the mode for device is valid or not.
 // Valid mode is a composition of r (read), w (write), and m (mknod).
 func validDeviceMode(mode string) bool {
-	var legalDeviceMode = map[rune]bool{
+	legalDeviceMode := map[rune]bool{
 		'r': true,
 		'w': true,
 		'm': true,
@@ -1006,7 +1004,7 @@ func validDeviceMode(mode string) bool {
 }
 
 // validateDevice validates a path for devices
-func validateDevice(val string, serverOS string) (string, error) {
+func validateDevice(val, serverOS string) (string, error) {
 	switch serverOS {
 	case "linux":
 		return validateLinuxPath(val, validDeviceMode)
@@ -1067,10 +1065,8 @@ func validateLinuxPath(val string, validator func(string) bool) (string, error) 
 // validateAttach validates that the specified string is a valid attach option.
 func validateAttach(val string) (string, error) {
 	s := strings.ToLower(val)
-	for _, str := range []string{"stdin", "stdout", "stderr"} {
-		if s == str {
-			return s, nil
-		}
+	if slices.Contains([]string{"stdin", "stdout", "stderr"}, s) {
+		return s, nil
 	}
 	return val, errors.Errorf("valid streams are STDIN, STDOUT and STDERR")
 }

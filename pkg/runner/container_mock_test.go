@@ -6,6 +6,7 @@ import (
 
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -15,7 +16,7 @@ type containerMock struct {
 	container.LinuxContainerEnvironmentExtensions
 }
 
-func (cm *containerMock) Create(capAdd []string, capDrop []string) common.Executor {
+func (cm *containerMock) Create(capAdd, capDrop []string) common.Executor {
 	args := cm.Called(capAdd, capDrop)
 	return args.Get(0).(func(context.Context) error)
 }
@@ -55,7 +56,7 @@ func (cm *containerMock) Copy(destPath string, files ...*container.FileEntry) co
 	return args.Get(0).(func(context.Context) error)
 }
 
-func (cm *containerMock) CopyDir(destPath string, srcPath string, useGitIgnore bool) common.Executor {
+func (cm *containerMock) CopyDir(destPath, srcPath string, useGitIgnore bool) common.Executor {
 	args := cm.Called(destPath, srcPath, useGitIgnore)
 	return args.Get(0).(func(context.Context) error)
 }

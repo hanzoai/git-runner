@@ -14,24 +14,24 @@ import (
 func TestMaxParallel2Quick(t *testing.T) {
 	ctx := context.Background()
 
-	var currentRunning int32
-	var maxSimultaneous int32
+	var currentRunning atomic.Int32
+	var maxSimultaneous atomic.Int32
 
 	executors := make([]Executor, 4)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		executors[i] = func(ctx context.Context) error {
-			current := atomic.AddInt32(&currentRunning, 1)
+			current := currentRunning.Add(1)
 
 			// Update max if needed
 			for {
-				maxValue := atomic.LoadInt32(&maxSimultaneous)
-				if current <= maxValue || atomic.CompareAndSwapInt32(&maxSimultaneous, maxValue, current) {
+				maxValue := maxSimultaneous.Load()
+				if current <= maxValue || maxSimultaneous.CompareAndSwap(maxValue, current) {
 					break
 				}
 			}
 
 			time.Sleep(10 * time.Millisecond)
-			atomic.AddInt32(&currentRunning, -1)
+			currentRunning.Add(-1)
 			return nil
 		}
 	}
@@ -39,7 +39,7 @@ func TestMaxParallel2Quick(t *testing.T) {
 	err := NewParallelExecutor(2, executors...)(ctx)
 
 	assert.NoError(t, err)
-	assert.LessOrEqual(t, atomic.LoadInt32(&maxSimultaneous), int32(2),
+	assert.LessOrEqual(t, maxSimultaneous.Load(), int32(2),
 		"Should not exceed max-parallel: 2")
 }
 
@@ -47,16 +47,16 @@ func TestMaxParallel2Quick(t *testing.T) {
 func TestMaxParallel1Sequential(t *testing.T) {
 	ctx := context.Background()
 
-	var currentRunning int32
-	var maxSimultaneous int32
+	var currentRunning atomic.Int32
+	var maxSimultaneous atomic.Int32
 	var executionOrder []int
 	var orderMutex sync.Mutex
 
 	executors := make([]Executor, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		taskID := i
 		executors[i] = func(ctx context.Context) error {
-			current := atomic.AddInt32(&currentRunning, 1)
+			current := currentRunning.Add(1)
 
 			// Track execution order
 			orderMutex.Lock()
@@ -65,14 +65,14 @@ func TestMaxParallel1Sequential(t *testing.T) {
 
 			// Update max if needed
 			for {
-				maxValue := atomic.LoadInt32(&maxSimultaneous)
-				if current <= maxValue || atomic.CompareAndSwapInt32(&maxSimultaneous, maxValue, current) {
+				maxValue := maxSimultaneous.Load()
+				if current <= maxValue || maxSimultaneous.CompareAndSwap(maxValue, current) {
 					break
 				}
 			}
 
 			time.Sleep(20 * time.Millisecond)
-			atomic.AddInt32(&currentRunning, -1)
+			currentRunning.Add(-1)
 			return nil
 		}
 	}
@@ -80,7 +80,7 @@ func TestMaxParallel1Sequential(t *testing.T) {
 	err := NewParallelExecutor(1, executors...)(ctx)
 
 	assert.NoError(t, err)
-	assert.Equal(t, int32(1), atomic.LoadInt32(&maxSimultaneous),
+	assert.Equal(t, int32(1), maxSimultaneous.Load(),
 		"max-parallel: 1 should only run 1 task at a time")
 	assert.Len(t, executionOrder, 5, "All 5 tasks should have executed")
 }

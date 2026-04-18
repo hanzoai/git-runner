@@ -8,14 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nektos/act/pkg/common"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"
-
 	// github.com/docker/docker/builder/dockerignore is deprecated
 	"github.com/moby/buildkit/frontend/dockerfile/dockerignore"
 	"github.com/moby/patternmatcher"
-
-	"github.com/nektos/act/pkg/common"
 )
 
 // NewDockerBuildExecutor function to create a run executor for the container
@@ -69,7 +68,8 @@ func NewDockerBuildExecutor(input NewDockerBuildExecutorInput) common.Executor {
 		return nil
 	}
 }
-func createBuildContext(ctx context.Context, contextDir string, relDockerfile string) (io.ReadCloser, error) {
+
+func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (io.ReadCloser, error) {
 	common.Logger(ctx).Debugf("Creating archive for build context dir '%s' with relative dockerfile '%s'", contextDir, relDockerfile)
 
 	// And canonicalize dockerfile name to a platform-independent one
@@ -96,7 +96,7 @@ func createBuildContext(ctx context.Context, contextDir string, relDockerfile st
 	// removed. The daemon will remove them for us, if needed, after it
 	// parses the Dockerfile. Ignore errors here, as they will have been
 	// caught by validateContextDirectory above.
-	var includes = []string{"."}
+	includes := []string{"."}
 	keepThem1, _ := patternmatcher.Matches(".dockerignore", excludes)
 	keepThem2, _ := patternmatcher.Matches(relDockerfile, excludes)
 	if keepThem1 || keepThem2 {

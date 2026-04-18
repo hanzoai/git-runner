@@ -74,7 +74,7 @@ func logDockerResponse(logger logrus.FieldLogger, dockerResponse io.ReadCloser, 
 	return nil
 }
 
-func writeLog(logger logrus.FieldLogger, isError bool, format string, args ...interface{}) {
+func writeLog(logger logrus.FieldLogger, isError bool, format string, args ...any) {
 	if isError {
 		logger.Errorf(format, args...)
 	} else {

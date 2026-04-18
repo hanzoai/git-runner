@@ -10,41 +10,41 @@ import (
 )
 
 type GithubContext struct {
-	Event            map[string]interface{} `json:"event"`
-	EventPath        string                 `json:"event_path"`
-	Workflow         string                 `json:"workflow"`
-	RunID            string                 `json:"run_id"`
-	RunNumber        string                 `json:"run_number"`
-	Actor            string                 `json:"actor"`
-	Repository       string                 `json:"repository"`
-	EventName        string                 `json:"event_name"`
-	Sha              string                 `json:"sha"`
-	Ref              string                 `json:"ref"`
-	RefName          string                 `json:"ref_name"`
-	RefType          string                 `json:"ref_type"`
-	HeadRef          string                 `json:"head_ref"`
-	BaseRef          string                 `json:"base_ref"`
-	Token            string                 `json:"token"`
-	Workspace        string                 `json:"workspace"`
-	Action           string                 `json:"action"`
-	ActionPath       string                 `json:"action_path"`
-	ActionRef        string                 `json:"action_ref"`
-	ActionRepository string                 `json:"action_repository"`
-	Job              string                 `json:"job"`
-	JobName          string                 `json:"job_name"`
-	RepositoryOwner  string                 `json:"repository_owner"`
-	RetentionDays    string                 `json:"retention_days"`
-	RunnerPerflog    string                 `json:"runner_perflog"`
-	RunnerTrackingID string                 `json:"runner_tracking_id"`
-	ServerURL        string                 `json:"server_url"`
-	APIURL           string                 `json:"api_url"`
-	GraphQLURL       string                 `json:"graphql_url"`
+	Event            map[string]any `json:"event"`
+	EventPath        string         `json:"event_path"`
+	Workflow         string         `json:"workflow"`
+	RunID            string         `json:"run_id"`
+	RunNumber        string         `json:"run_number"`
+	Actor            string         `json:"actor"`
+	Repository       string         `json:"repository"`
+	EventName        string         `json:"event_name"`
+	Sha              string         `json:"sha"`
+	Ref              string         `json:"ref"`
+	RefName          string         `json:"ref_name"`
+	RefType          string         `json:"ref_type"`
+	HeadRef          string         `json:"head_ref"`
+	BaseRef          string         `json:"base_ref"`
+	Token            string         `json:"token"`
+	Workspace        string         `json:"workspace"`
+	Action           string         `json:"action"`
+	ActionPath       string         `json:"action_path"`
+	ActionRef        string         `json:"action_ref"`
+	ActionRepository string         `json:"action_repository"`
+	Job              string         `json:"job"`
+	JobName          string         `json:"job_name"`
+	RepositoryOwner  string         `json:"repository_owner"`
+	RetentionDays    string         `json:"retention_days"`
+	RunnerPerflog    string         `json:"runner_perflog"`
+	RunnerTrackingID string         `json:"runner_tracking_id"`
+	ServerURL        string         `json:"server_url"`
+	APIURL           string         `json:"api_url"`
+	GraphQLURL       string         `json:"graphql_url"`
 
 	// For Gitea
 	RunAttempt string `json:"run_attempt"`
 }
 
-func asString(v interface{}) string {
+func asString(v any) string {
 	if v == nil {
 		return ""
 	} else if s, ok := v.(string); ok {
@@ -53,7 +53,7 @@ func asString(v interface{}) string {
 	return ""
 }
 
-func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) {
+func nestedMapLookup(m map[string]any, ks ...string) (rval any) {
 	var ok bool
 
 	if len(ks) == 0 { // degenerate input
@@ -63,20 +63,20 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 		return nil
 	} else if len(ks) == 1 { // we've reached the final key
 		return rval
-	} else if m, ok = rval.(map[string]interface{}); !ok {
+	} else if m, ok = rval.(map[string]any); !ok {
 		return nil
 	} else { // 1+ more keys
 		return nestedMapLookup(m, ks[1:]...)
 	}
 }
 
-func withDefaultBranch(ctx context.Context, b string, event map[string]interface{}) map[string]interface{} {
+func withDefaultBranch(ctx context.Context, b string, event map[string]any) map[string]any {
 	repoI, ok := event["repository"]
 	if !ok {
-		repoI = make(map[string]interface{})
+		repoI = make(map[string]any)
 	}
 
-	repo, ok := repoI.(map[string]interface{})
+	repo, ok := repoI.(map[string]any)
 	if !ok {
 		common.Logger(ctx).Warnf("unable to set default branch to %v", b)
 		return event
@@ -93,29 +93,31 @@ func withDefaultBranch(ctx context.Context, b string, event map[string]interface
 	return event
 }
 
-var findGitRef = git.FindGitRef
-var findGitRevision = git.FindGitRevision
+var (
+	findGitRef      = git.FindGitRef
+	findGitRevision = git.FindGitRevision
+)
 
-func (ghc *GithubContext) SetRef(ctx context.Context, defaultBranch string, repoPath string) {
+func (ghc *GithubContext) SetRef(ctx context.Context, defaultBranch, repoPath string) {
 	logger := common.Logger(ctx)
 
 	// https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
 	// https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads
 	switch ghc.EventName {
 	case "pull_request_target":
-		ghc.Ref = fmt.Sprintf("refs/heads/%s", ghc.BaseRef)
+		ghc.Ref = "refs/heads/" + ghc.BaseRef
 	case "pull_request", "pull_request_review", "pull_request_review_comment":
 		ghc.Ref = fmt.Sprintf("refs/pull/%.0f/merge", ghc.Event["number"])
 	case "deployment", "deployment_status":
 		ghc.Ref = asString(nestedMapLookup(ghc.Event, "deployment", "ref"))
 	case "release":
-		ghc.Ref = fmt.Sprintf("refs/tags/%s", asString(nestedMapLookup(ghc.Event, "release", "tag_name")))
+		ghc.Ref = "refs/tags/" + asString(nestedMapLookup(ghc.Event, "release", "tag_name"))
 	case "push", "create", "workflow_dispatch":
 		ghc.Ref = asString(ghc.Event["ref"])
 	default:
 		defaultBranch := asString(nestedMapLookup(ghc.Event, "repository", "default_branch"))
 		if defaultBranch != "" {
-			ghc.Ref = fmt.Sprintf("refs/heads/%s", defaultBranch)
+			ghc.Ref = "refs/heads/" + defaultBranch
 		}
 	}
 
@@ -136,7 +138,7 @@ func (ghc *GithubContext) SetRef(ctx context.Context, defaultBranch string, repo
 		}
 
 		if ghc.Ref == "" {
-			ghc.Ref = fmt.Sprintf("refs/heads/%s", asString(nestedMapLookup(ghc.Event, "repository", "default_branch")))
+			ghc.Ref = "refs/heads/" + asString(nestedMapLookup(ghc.Event, "repository", "default_branch"))
 		}
 	}
 }
@@ -167,7 +169,7 @@ func (ghc *GithubContext) SetSha(ctx context.Context, repoPath string) {
 	}
 }
 
-func (ghc *GithubContext) SetRepositoryAndOwner(ctx context.Context, githubInstance string, remoteName string, repoPath string) {
+func (ghc *GithubContext) SetRepositoryAndOwner(ctx context.Context, githubInstance, remoteName, repoPath string) {
 	if ghc.Repository == "" {
 		repo, err := git.FindGithubRepo(ctx, repoPath, githubInstance, remoteName)
 		if err != nil {

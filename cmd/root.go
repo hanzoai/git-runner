@@ -4,12 +4,21 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
+
+	"github.com/nektos/act/pkg/artifactcache"
+	"github.com/nektos/act/pkg/artifacts"
+	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/container"
+	"github.com/nektos/act/pkg/model"
+	"github.com/nektos/act/pkg/runner"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/adrg/xdg"
@@ -20,13 +29,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
-
-	"github.com/nektos/act/pkg/artifactcache"
-	"github.com/nektos/act/pkg/artifacts"
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/runner"
 )
 
 // Execute is the entry point to running the CLI
@@ -147,7 +149,7 @@ func bugReport(ctx context.Context, version string) error {
 	report := sprintf("act version:", version)
 	report += sprintf("GOOS:", runtime.GOOS)
 	report += sprintf("GOARCH:", runtime.GOARCH)
-	report += sprintf("NumCPU:", fmt.Sprint(runtime.NumCPU()))
+	report += sprintf("NumCPU:", strconv.Itoa(runtime.NumCPU()))
 
 	var dockerHost string
 	var exists bool
@@ -216,7 +218,7 @@ func bugReport(ctx context.Context, version string) error {
 	report += sprintf("\tOS version:", info.OSVersion)
 	report += sprintf("\tOS arch:", info.Architecture)
 	report += sprintf("\tOS kernel:", info.KernelVersion)
-	report += sprintf("\tOS CPU:", fmt.Sprint(info.NCPU))
+	report += sprintf("\tOS CPU:", strconv.Itoa(info.NCPU))
 	report += sprintf("\tOS memory:", fmt.Sprintf("%d MB", info.MemTotal/1024/1024))
 
 	report += fmt.Sprintln("\tSecurity options:")
@@ -305,9 +307,7 @@ func readEnvs(path string, envs map[string]string) bool {
 		if err != nil {
 			log.Fatalf("Error loading from %s: %v", path, err)
 		}
-		for k, v := range env {
-			envs[k] = v
-		}
+		maps.Copy(envs, env)
 		return true
 	}
 	return false
@@ -330,7 +330,7 @@ func parseMatrix(matrix []string) map[string]map[string]bool {
 	return matrixes
 }
 
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if input.jsonLogger {
@@ -511,7 +511,7 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 			log.Warnf(deprecationWarning, "privileged", "--privileged")
 		}
 		if len(input.usernsMode) > 0 {
-			log.Warnf(deprecationWarning, "userns", fmt.Sprintf("--userns=%s", input.usernsMode))
+			log.Warnf(deprecationWarning, "userns", "--userns="+input.usernsMode)
 		}
 		if len(input.containerCapAdd) > 0 {
 			log.Warnf(deprecationWarning, "container-cap-add", fmt.Sprintf("--cap-add=%s", input.containerCapAdd))

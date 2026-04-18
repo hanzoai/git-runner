@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	docker_container "github.com/docker/docker/api/types/container"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
+
+	docker_container "github.com/docker/docker/api/types/container"
+	log "github.com/sirupsen/logrus"
 )
 
 // Runner provides capabilities to run GitHub actions
@@ -133,6 +133,8 @@ func (runner *runnerImpl) configure() (Runner, error) {
 }
 
 // NewPlanExecutor ...
+//
+//nolint:gocyclo // function handles many cases
 func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 	maxJobNameLen := 0
 
@@ -182,7 +184,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 					}
 				}
 
-				var matrixes []map[string]interface{}
+				var matrixes []map[string]any
 				if m, err := job.GetMatrixes(); err != nil {
 					log.Errorf("Error while get job's matrix: %v", err)
 				} else {
@@ -210,7 +212,6 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 				log.Infof("Running job with maxParallel=%d for %d matrix combinations", maxParallel, len(matrixes))
 
 				for i, matrix := range matrixes {
-					matrix := matrix
 					rc := runner.newRunContext(ctx, run, matrix)
 					rc.JobName = rc.Name
 					if len(matrixes) > 1 {
@@ -225,7 +226,6 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 					stageExecutor = append(stageExecutor, func(ctx context.Context) error {
 						jobName := fmt.Sprintf("%-*s", maxJobNameLen, rc.String())
 						executor, err := rc.Executor()
-
 						if err != nil {
 							return err
 						}
@@ -287,8 +287,8 @@ func handleFailure(plan *model.Plan) common.Executor {
 	}
 }
 
-func selectMatrixes(originalMatrixes []map[string]interface{}, targetMatrixValues map[string]map[string]bool) []map[string]interface{} {
-	matrixes := make([]map[string]interface{}, 0)
+func selectMatrixes(originalMatrixes []map[string]any, targetMatrixValues map[string]map[string]bool) []map[string]any {
+	matrixes := make([]map[string]any, 0)
 	for _, original := range originalMatrixes {
 		flag := true
 		for key, val := range original {
@@ -306,7 +306,7 @@ func selectMatrixes(originalMatrixes []map[string]interface{}, targetMatrixValue
 	return matrixes
 }
 
-func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, matrix map[string]interface{}) *RunContext {
+func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, matrix map[string]any) *RunContext {
 	rc := &RunContext{
 		Config:      runner.config,
 		Run:         run,
@@ -322,7 +322,7 @@ func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, mat
 }
 
 // For Gitea
-func (c *caller) setReusedWorkflowJobResult(jobName string, result string) {
+func (c *caller) setReusedWorkflowJobResult(jobName, result string) {
 	c.updateResultLock.Lock()
 	defer c.updateResultLock.Unlock()
 	c.reusedWorkflowJobResults[jobName] = result

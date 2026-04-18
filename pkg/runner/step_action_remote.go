@@ -12,11 +12,11 @@ import (
 	"regexp"
 	"strings"
 
-	gogit "github.com/go-git/go-git/v5"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/common/git"
 	"github.com/nektos/act/pkg/model"
+
+	gogit "github.com/go-git/go-git/v5"
 )
 
 type stepActionRemote struct {
@@ -35,6 +35,7 @@ type stepActionRemote struct {
 
 var stepActionRemoteNewCloneExecutor = git.NewGitCloneExecutor
 
+//nolint:gocyclo // function handles many cases
 func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 	return func(ctx context.Context) error {
 		if sar.remoteAction != nil && sar.action != nil {
@@ -80,7 +81,7 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			remoteReader := func(ctx context.Context) actionYamlReader {
 				return func(filename string) (io.Reader, io.Closer, error) {
 					spath := path.Join(sar.remoteAction.Path, filename)
-					for i := 0; i < maxSymlinkDepth; i++ {
+					for range maxSymlinkDepth {
 						tars, err := cache.GetTarArchive(ctx, sar.cacheDir, sar.resolvedSha, spath)
 						if err != nil {
 							return nil, nil, os.ErrNotExist
@@ -301,8 +302,8 @@ func (ra *remoteAction) IsCheckout() bool {
 func newRemoteAction(action string) *remoteAction {
 	// support http(s)://host/owner/repo@v3
 	for _, schema := range []string{"https://", "http://"} {
-		if strings.HasPrefix(action, schema) {
-			splits := strings.SplitN(strings.TrimPrefix(action, schema), "/", 2)
+		if after, ok := strings.CutPrefix(action, schema); ok {
+			splits := strings.SplitN(after, "/", 2)
 			if len(splits) != 2 {
 				return nil
 			}

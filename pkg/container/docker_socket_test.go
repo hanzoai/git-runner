@@ -19,7 +19,7 @@ func TestGetSocketAndHostWithSocket(t *testing.T) {
 	CommonSocketLocations = originalCommonSocketLocations
 	dockerHost := "unix:///my/docker/host.sock"
 	socketURI := "/path/to/my.socket"
-	os.Setenv("DOCKER_HOST", dockerHost)
+	t.Setenv("DOCKER_HOST", dockerHost)
 
 	// Act
 	ret, err := GetSocketAndHost(socketURI)
@@ -32,7 +32,7 @@ func TestGetSocketAndHostWithSocket(t *testing.T) {
 func TestGetSocketAndHostNoSocket(t *testing.T) {
 	// Arrange
 	dockerHost := "unix:///my/docker/host.sock"
-	os.Setenv("DOCKER_HOST", dockerHost)
+	t.Setenv("DOCKER_HOST", dockerHost)
 
 	// Act
 	ret, err := GetSocketAndHost("")
@@ -63,7 +63,7 @@ func TestGetSocketAndHostDontMount(t *testing.T) {
 	// Arrange
 	CommonSocketLocations = originalCommonSocketLocations
 	dockerHost := "unix:///my/docker/host.sock"
-	os.Setenv("DOCKER_HOST", dockerHost)
+	t.Setenv("DOCKER_HOST", dockerHost)
 
 	// Act
 	ret, err := GetSocketAndHost("-")
@@ -93,7 +93,7 @@ func TestGetSocketAndHostNoHostNoSocket(t *testing.T) {
 // > This happens if neither DOCKER_HOST nor --container-daemon-socket has a value, but socketLocation() returns a URI
 func TestGetSocketAndHostNoHostNoSocketDefaultLocation(t *testing.T) {
 	// Arrange
-	mySocketFile, tmpErr := os.CreateTemp("", "act-*.sock")
+	mySocketFile, tmpErr := os.CreateTemp(t.TempDir(), "act-*.sock")
 	mySocket := mySocketFile.Name()
 	unixSocket := "unix://" + mySocket
 	defer os.RemoveAll(mySocket)

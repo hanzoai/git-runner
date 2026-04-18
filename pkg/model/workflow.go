@@ -4,15 +4,17 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/nektos/act/pkg/common"
+
 	log "github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v4"
-
-	"github.com/nektos/act/pkg/common"
 )
 
 // Workflow is the structure of the files in .github/workflows
@@ -45,7 +47,7 @@ func (w *Workflow) On() []string {
 		}
 		return val
 	case yaml.MappingNode:
-		var val map[string]interface{}
+		var val map[string]any
 		err := w.RawOn.Decode(&val)
 		if err != nil {
 			log.Fatal(err)
@@ -59,9 +61,9 @@ func (w *Workflow) On() []string {
 	return nil
 }
 
-func (w *Workflow) OnEvent(event string) interface{} {
+func (w *Workflow) OnEvent(event string) any {
 	if w.RawOn.Kind == yaml.MappingNode {
-		var val map[string]interface{}
+		var val map[string]any
 		if !decodeNode(w.RawOn, &val) {
 			return nil
 		}
@@ -77,10 +79,10 @@ func (w *Workflow) OnSchedule() []string {
 	}
 
 	switch val := schedules.(type) {
-	case []interface{}:
+	case []any:
 		allSchedules := []string{}
 		for _, v := range val {
-			for k, cron := range v.(map[string]interface{}) {
+			for k, cron := range v.(map[string]any) {
 				if k != "cron" {
 					continue
 				}
@@ -121,10 +123,8 @@ func (w *Workflow) WorkflowDispatchConfig() *WorkflowDispatch {
 		if !decodeNode(w.RawOn, &val) {
 			return nil
 		}
-		for _, v := range val {
-			if v == "workflow_dispatch" {
-				return &WorkflowDispatch{}
-			}
+		if slices.Contains(val, "workflow_dispatch") {
+			return &WorkflowDispatch{}
 		}
 	case yaml.MappingNode:
 		var val map[string]yaml.Node
@@ -199,7 +199,7 @@ type Job struct {
 	Defaults       Defaults                  `yaml:"defaults"`
 	Outputs        map[string]string         `yaml:"outputs"`
 	Uses           string                    `yaml:"uses"`
-	With           map[string]interface{}    `yaml:"with"`
+	With           map[string]any            `yaml:"with"`
 	RawSecrets     yaml.Node                 `yaml:"secrets"`
 	RawPermissions yaml.Node                 `yaml:"permissions"`
 	Result         string
@@ -378,9 +378,9 @@ func (j *Job) Environment() map[string]string {
 }
 
 // Matrix decodes RawMatrix YAML node
-func (j *Job) Matrix() map[string][]interface{} {
+func (j *Job) Matrix() map[string][]any {
 	if j.Strategy.RawMatrix.Kind == yaml.MappingNode {
-		var val map[string][]interface{}
+		var val map[string][]any
 		if !decodeNode(j.Strategy.RawMatrix, &val) {
 			return nil
 		}
@@ -392,22 +392,22 @@ func (j *Job) Matrix() map[string][]interface{} {
 // GetMatrixes returns the matrix cross product
 // It skips includes and hard fails excludes for non-existing keys
 //
-//nolint:gocyclo
-func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
-	matrixes := make([]map[string]interface{}, 0)
+//nolint:gocyclo // function handles many cases
+func (j *Job) GetMatrixes() ([]map[string]any, error) {
+	matrixes := make([]map[string]any, 0)
 	if j.Strategy != nil {
 		// Always set these values, even if there's an error later
 		j.Strategy.FailFast = j.Strategy.GetFailFast()
 		j.Strategy.MaxParallel = j.Strategy.GetMaxParallel()
 
 		if m := j.Matrix(); m != nil {
-			includes := make([]map[string]interface{}, 0)
-			extraIncludes := make([]map[string]interface{}, 0)
+			includes := make([]map[string]any, 0)
+			extraIncludes := make([]map[string]any, 0)
 			for _, v := range m["include"] {
 				switch t := v.(type) {
-				case []interface{}:
+				case []any:
 					for _, i := range t {
-						i := i.(map[string]interface{})
+						i := i.(map[string]any)
 						extraInclude := true
 						for k := range i {
 							if _, ok := m[k]; ok {
@@ -420,8 +420,8 @@ func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 							extraIncludes = append(extraIncludes, i)
 						}
 					}
-				case interface{}:
-					v := v.(map[string]interface{})
+				case any:
+					v := v.(map[string]any)
 					extraInclude := true
 					for k := range v {
 						if _, ok := m[k]; ok {
@@ -437,9 +437,9 @@ func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 			}
 			delete(m, "include")
 
-			excludes := make([]map[string]interface{}, 0)
+			excludes := make([]map[string]any, 0)
 			for _, e := range m["exclude"] {
-				e := e.(map[string]interface{})
+				e := e.(map[string]any)
 				for k := range e {
 					if _, ok := m[k]; ok {
 						excludes = append(excludes, e)
@@ -468,9 +468,7 @@ func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 					if commonKeysMatch2(matrix, include, m) {
 						matched = true
 						log.Debugf("Adding include values '%v' to existing entry", include)
-						for k, v := range include {
-							matrix[k] = v
-						}
+						maps.Copy(matrix, include)
 					}
 				}
 				if !matched {
@@ -482,19 +480,19 @@ func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 				matrixes = append(matrixes, include)
 			}
 			if len(matrixes) == 0 {
-				matrixes = append(matrixes, make(map[string]interface{}))
+				matrixes = append(matrixes, make(map[string]any))
 			}
 		} else {
-			matrixes = append(matrixes, make(map[string]interface{}))
+			matrixes = append(matrixes, make(map[string]any))
 		}
 	} else {
-		matrixes = append(matrixes, make(map[string]interface{}))
+		matrixes = append(matrixes, make(map[string]any))
 		log.Debugf("Empty Strategy, matrixes=%v", matrixes)
 	}
 	return matrixes, nil
 }
 
-func commonKeysMatch(a map[string]interface{}, b map[string]interface{}) bool {
+func commonKeysMatch(a, b map[string]any) bool {
 	for aKey, aVal := range a {
 		if bVal, ok := b[aKey]; ok && !reflect.DeepEqual(aVal, bVal) {
 			return false
@@ -503,7 +501,7 @@ func commonKeysMatch(a map[string]interface{}, b map[string]interface{}) bool {
 	return true
 }
 
-func commonKeysMatch2(a map[string]interface{}, b map[string]interface{}, m map[string][]interface{}) bool {
+func commonKeysMatch2(a, b map[string]any, m map[string][]any) bool {
 	for aKey, aVal := range a {
 		_, useKey := m[aKey]
 		if bVal, ok := b[aKey]; useKey && ok && !reflect.DeepEqual(aVal, bVal) {
@@ -623,7 +621,7 @@ func (s *Step) GetEnv() map[string]string {
 
 	for k, v := range s.With {
 		envKey := regexp.MustCompile("[^A-Z0-9-]").ReplaceAllString(strings.ToUpper(k), "_")
-		envKey = fmt.Sprintf("INPUT_%s", strings.ToUpper(envKey))
+		envKey = "INPUT_" + strings.ToUpper(envKey)
 		env[envKey] = v
 	}
 	return env
@@ -631,7 +629,7 @@ func (s *Step) GetEnv() map[string]string {
 
 // ShellCommand returns the command for the shell
 func (s *Step) ShellCommand() string {
-	shellCommand := ""
+	var shellCommand string
 
 	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L9-L17
 	switch s.Shell {
@@ -760,11 +758,11 @@ func (w *Workflow) GetJobIDs() []string {
 	return ids
 }
 
-var OnDecodeNodeError = func(node yaml.Node, out interface{}, err error) {
+var OnDecodeNodeError = func(node yaml.Node, out any, err error) {
 	log.Fatalf("Failed to decode node %v into %T: %v", node, out, err)
 }
 
-func decodeNode(node yaml.Node, out interface{}) bool {
+func decodeNode(node yaml.Node, out any) bool {
 	if err := node.Decode(out); err != nil {
 		if OnDecodeNodeError != nil {
 			OnDecodeNodeError(node, out, err)
@@ -791,7 +789,7 @@ func (r *RawConcurrency) UnmarshalYAML(n *yaml.Node) error {
 	return n.Decode((*objectConcurrency)(r))
 }
 
-func (r *RawConcurrency) MarshalYAML() (interface{}, error) {
+func (r *RawConcurrency) MarshalYAML() (any, error) {
 	if r.RawExpression != "" {
 		return r.RawExpression, nil
 	}

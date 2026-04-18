@@ -10,6 +10,7 @@ import (
 
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.yaml.in/yaml/v4"
@@ -24,7 +25,7 @@ func (salm *stepActionLocalMocks) runAction(step actionStep, actionDir string, r
 	return args.Get(0).(func(context.Context) error)
 }
 
-func (salm *stepActionLocalMocks) readAction(_ context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
+func (salm *stepActionLocalMocks) readAction(_ context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
 	args := salm.Called(step, actionDir, actionPath, readFile, writeFile)
 	return args.Get(0).(*model.Action), args.Error(1)
 }
@@ -257,7 +258,7 @@ func TestStepActionLocalPost(t *testing.T) {
 			sal.RunContext.ExprEval = sal.RunContext.NewExpressionEvaluator(ctx)
 
 			if tt.mocks.exec {
-				suffixMatcher := func(suffix string) interface{} {
+				suffixMatcher := func(suffix string) any {
 					return mock.MatchedBy(func(array []string) bool {
 						return strings.HasSuffix(array[1], suffix)
 					})

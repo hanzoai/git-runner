@@ -5,17 +5,15 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-//nolint:gosec
 func TestActionCache(t *testing.T) {
 	a := assert.New(t)
 	cache := &GoGitActionCache{
-		Path: os.TempDir(),
+		Path: t.TempDir(),
 	}
 	ctx := context.Background()
 	cacheDir := "nektos/act-test-actions"

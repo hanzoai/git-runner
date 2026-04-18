@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/nektos/act/pkg/common"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type FileContainerResourceURL struct {
@@ -55,8 +55,7 @@ type WriteFS interface {
 	OpenAppendable(name string) (WritableFile, error)
 }
 
-type readWriteFSImpl struct {
-}
+type readWriteFSImpl struct{}
 
 func (fwfs readWriteFSImpl) Open(name string) (fs.File, error) {
 	return os.Open(name)
@@ -74,7 +73,6 @@ func (fwfs readWriteFSImpl) OpenAppendable(name string) (WritableFile, error) {
 		return nil, err
 	}
 	file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o644)
-
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +86,7 @@ func (fwfs readWriteFSImpl) OpenAppendable(name string) (WritableFile, error) {
 
 var gzipExtension = ".gz__"
 
-func safeResolve(baseDir string, relPath string) string {
+func safeResolve(baseDir, relPath string) string {
 	return filepath.Join(baseDir, filepath.Clean(filepath.Join(string(os.PathSeparator), relPath)))
 }
 
@@ -127,7 +125,6 @@ func uploads(router *httprouter.Router, baseDir string, fsys WriteFS) {
 			}
 			return fsys.OpenWritable(safePath)
 		}()
-
 		if err != nil {
 			panic(err)
 		}
@@ -275,7 +272,7 @@ func downloads(router *httprouter.Router, baseDir string, fsys fs.FS) {
 	})
 }
 
-func Serve(ctx context.Context, artifactPath string, addr string, port string) context.CancelFunc {
+func Serve(ctx context.Context, artifactPath, addr, port string) context.CancelFunc {
 	serverContext, cancel := context.WithCancel(ctx)
 	logger := common.Logger(serverContext)
 

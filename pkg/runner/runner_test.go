@@ -12,13 +12,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/model"
+
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v4"
-
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/model"
 )
 
 var (
@@ -528,9 +528,9 @@ func (f *maskJobLoggerFactory) WithJobLogger() *log.Logger {
 }
 
 func TestMaskValues(t *testing.T) {
-	assertNoSecret := func(text string, secret string) {
-		index := strings.Index(text, "composite secret")
-		if index > -1 {
+	assertNoSecret := func(text, secret string) {
+		found := strings.Contains(text, "composite secret")
+		if found {
 			fmt.Printf("\nFound Secret in the given text:\n%s\n", text)
 		}
 		assert.False(t, strings.Contains(text, "composite secret"))
@@ -607,7 +607,7 @@ func TestRunWithService(t *testing.T) {
 	runner, err := New(runnerConfig)
 	assert.NoError(t, err, workflowPath)
 
-	planner, err := model.NewWorkflowPlanner(fmt.Sprintf("testdata/%s", workflowPath), true)
+	planner, err := model.NewWorkflowPlanner("testdata/"+workflowPath, true)
 	assert.NoError(t, err, workflowPath)
 
 	plan, err := planner.PlanEvent(eventName)

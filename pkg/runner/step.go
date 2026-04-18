@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	maps0 "maps"
 	"path"
 	"strconv"
 	"strings"
@@ -142,7 +143,7 @@ func runStepExecutor(step step, stage stepStage, executor common.Executor) commo
 			Mode: 0o666,
 		}, &container.FileEntry{
 			Name: envFileCommand,
-			Mode: 0666,
+			Mode: 0o666,
 		}, &container.FileEntry{
 			Name: summaryFileCommand,
 			Mode: 0o666,
@@ -295,9 +296,7 @@ func mergeIntoMap(step step, target *map[string]string, maps ...map[string]strin
 
 func mergeIntoMapCaseSensitive(target map[string]string, maps ...map[string]string) {
 	for _, m := range maps {
-		for k, v := range m {
-			target[k] = v
-		}
+		maps0.Copy(target, m)
 	}
 }
 

@@ -2,13 +2,16 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -38,9 +41,9 @@ type jobInfoMock struct {
 	mock.Mock
 }
 
-func (jim *jobInfoMock) matrix() map[string]interface{} {
+func (jim *jobInfoMock) matrix() map[string]any {
 	args := jim.Called()
-	return args.Get(0).(map[string]interface{})
+	return args.Get(0).(map[string]any)
 }
 
 func (jim *jobInfoMock) steps() []*model.Step {
@@ -232,12 +235,7 @@ func TestNewJobExecutor(t *testing.T) {
 	}
 
 	contains := func(needle string, haystack []string) bool {
-		for _, item := range haystack {
-			if item == needle {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(haystack, needle)
 	}
 
 	for _, tt := range table {
@@ -272,9 +270,6 @@ func TestNewJobExecutor(t *testing.T) {
 			}
 
 			for i, stepModel := range tt.steps {
-				i := i
-				stepModel := stepModel
-
 				sm := &stepMock{}
 
 				sfm.On("newStep", stepModel, rc).Return(sm, nil)
@@ -289,7 +284,7 @@ func TestNewJobExecutor(t *testing.T) {
 				sm.On("main").Return(func(ctx context.Context) error {
 					executorOrder = append(executorOrder, "step"+stepModel.ID)
 					if tt.hasError {
-						return fmt.Errorf("error")
+						return errors.New("error")
 					}
 					return nil
 				})
@@ -305,7 +300,7 @@ func TestNewJobExecutor(t *testing.T) {
 			}
 
 			if len(tt.steps) > 0 {
-				jim.On("matrix").Return(map[string]interface{}{})
+				jim.On("matrix").Return(map[string]any{})
 
 				jim.On("interpolateOutputs").Return(func(ctx context.Context) error {
 					executorOrder = append(executorOrder, "interpolateOutputs")

@@ -6,17 +6,19 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
+
 	assert "github.com/stretchr/testify/assert"
 	yaml "go.yaml.in/yaml/v4"
 )
 
 func createRunContext(t *testing.T) *RunContext {
 	var yml yaml.Node
-	err := yml.Encode(map[string][]interface{}{
+	err := yml.Encode(map[string][]any{
 		"os":  {"Linux", "Windows"},
 		"foo": {"bar", "baz"},
 	})
@@ -48,7 +50,7 @@ func createRunContext(t *testing.T) *RunContext {
 				},
 			},
 		},
-		Matrix: map[string]interface{}{
+		Matrix: map[string]any{
 			"os":  "Linux",
 			"foo": "bar",
 		},
@@ -84,7 +86,7 @@ func TestEvaluateRunContext(t *testing.T) {
 
 	tables := []struct {
 		in      string
-		out     interface{}
+		out     any
 		errMesg string
 	}{
 		{" 1 ", 1, ""},
@@ -138,7 +140,6 @@ func TestEvaluateRunContext(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			out, err := ee.evaluate(context.Background(), table.in, exprparser.DefaultStatusCheckNone)
@@ -163,7 +164,7 @@ func TestEvaluateStep(t *testing.T) {
 
 	tables := []struct {
 		in      string
-		out     interface{}
+		out     any
 		errMesg string
 	}{
 		{"steps.idwithnothing.conclusion", model.StepStatusSuccess.String(), ""},
@@ -178,7 +179,6 @@ func TestEvaluateStep(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			out, err := ee.evaluate(context.Background(), table.in, exprparser.DefaultStatusCheckNone)
@@ -262,7 +262,6 @@ func TestInterpolate(t *testing.T) {
 
 	updateTestExpressionWorkflow(t, tables, rc)
 	for _, table := range tables {
-		table := table
 		t.Run("interpolate", func(t *testing.T) {
 			assertObject := assert.New(t)
 			out := ee.Interpolate(context.Background(), table.in)
@@ -274,19 +273,21 @@ func TestInterpolate(t *testing.T) {
 func updateTestExpressionWorkflow(t *testing.T, tables []struct {
 	in  string
 	out string
-}, rc *RunContext) {
-	var envs string
+}, rc *RunContext,
+) {
+	var envs strings.Builder
 	keys := make([]string, 0, len(rc.Env))
 	for k := range rc.Env {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		envs += fmt.Sprintf("  %s: %s\n", k, rc.Env[k])
+		envs.WriteString(fmt.Sprintf("  %s: %s\n", k, rc.Env[k]))
 	}
 
 	// editorconfig-checker-disable
-	workflow := fmt.Sprintf(`
+	var workflow strings.Builder
+	workflow.WriteString(fmt.Sprintf(`
 name: "Test how expressions are handled on GitHub"
 on: push
 
@@ -297,7 +298,7 @@ jobs:
   test-espressions:
     runs-on: ubuntu-latest
     steps:
-`, envs)
+`, envs.String()))
 	// editorconfig-checker-enable
 	for _, table := range tables {
 		expressionPattern := regexp.MustCompile(`\${{\s*(.+?)\s*}}`)
@@ -307,7 +308,7 @@ jobs:
 		})
 		name := fmt.Sprintf(`%s -> %s should be equal to %s`, expr, table.in, table.out)
 		echo := `run: echo "Done "`
-		workflow += fmt.Sprintf("\n      - name: %s\n        %s\n", name, echo)
+		workflow.WriteString(fmt.Sprintf("\n      - name: %s\n        %s\n", name, echo))
 	}
 
 	file, err := os.Create("../../.github/workflows/test-expressions.yml")
@@ -315,7 +316,7 @@ jobs:
 		t.Fatal(err)
 	}
 
-	_, err = file.WriteString(workflow)
+	_, err = file.WriteString(workflow.String())
 	if err != nil {
 		t.Fatal(err)
 	}

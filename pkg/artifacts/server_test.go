@@ -13,12 +13,12 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/nektos/act/pkg/model"
+	"github.com/nektos/act/pkg/runner"
+
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/runner"
 )
 
 type writableMapFile struct {
@@ -39,7 +39,7 @@ type writeMapFS struct {
 }
 
 func (fsys writeMapFS) OpenWritable(name string) (WritableFile, error) {
-	var file = &writableMapFile{
+	file := &writableMapFile{
 		MapFile: fstest.MapFile{
 			Data: []byte("content2"),
 		},
@@ -50,7 +50,7 @@ func (fsys writeMapFS) OpenWritable(name string) (WritableFile, error) {
 }
 
 func (fsys writeMapFS) OpenAppendable(name string) (WritableFile, error) {
-	var file = &writableMapFile{
+	file := &writableMapFile{
 		MapFile: fstest.MapFile{
 			Data: []byte("content2"),
 		},
@@ -63,12 +63,12 @@ func (fsys writeMapFS) OpenAppendable(name string) (WritableFile, error) {
 func TestNewArtifactUploadPrepare(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{})
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{})
 
 	router := httprouter.New()
 	uploads(router, "artifact/server/path", writeMapFS{memfs})
 
-	req, _ := http.NewRequest("POST", "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
+	req, _ := http.NewRequest(http.MethodPost, "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -89,12 +89,12 @@ func TestNewArtifactUploadPrepare(t *testing.T) {
 func TestArtifactUploadBlob(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{})
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{})
 
 	router := httprouter.New()
 	uploads(router, "artifact/server/path", writeMapFS{memfs})
 
-	req, _ := http.NewRequest("PUT", "http://localhost/upload/1?itemPath=some/file", strings.NewReader("content"))
+	req, _ := http.NewRequest(http.MethodPut, "http://localhost/upload/1?itemPath=some/file", strings.NewReader("content"))
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -116,12 +116,12 @@ func TestArtifactUploadBlob(t *testing.T) {
 func TestFinalizeArtifactUpload(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{})
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{})
 
 	router := httprouter.New()
 	uploads(router, "artifact/server/path", writeMapFS{memfs})
 
-	req, _ := http.NewRequest("PATCH", "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
+	req, _ := http.NewRequest(http.MethodPatch, "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -142,7 +142,7 @@ func TestFinalizeArtifactUpload(t *testing.T) {
 func TestListArtifacts(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{
 		"artifact/server/path/1/file.txt": {
 			Data: []byte(""),
 		},
@@ -151,7 +151,7 @@ func TestListArtifacts(t *testing.T) {
 	router := httprouter.New()
 	downloads(router, "artifact/server/path", memfs)
 
-	req, _ := http.NewRequest("GET", "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/_apis/pipelines/workflows/1/artifacts", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -174,7 +174,7 @@ func TestListArtifacts(t *testing.T) {
 func TestListArtifactContainer(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{
 		"artifact/server/path/1/some/file": {
 			Data: []byte(""),
 		},
@@ -183,7 +183,7 @@ func TestListArtifactContainer(t *testing.T) {
 	router := httprouter.New()
 	downloads(router, "artifact/server/path", memfs)
 
-	req, _ := http.NewRequest("GET", "http://localhost/download/1?itemPath=some/file", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/download/1?itemPath=some/file", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -207,7 +207,7 @@ func TestListArtifactContainer(t *testing.T) {
 func TestDownloadArtifactFile(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{
 		"artifact/server/path/1/some/file": {
 			Data: []byte("content"),
 		},
@@ -216,7 +216,7 @@ func TestDownloadArtifactFile(t *testing.T) {
 	router := httprouter.New()
 	downloads(router, "artifact/server/path", memfs)
 
-	req, _ := http.NewRequest("GET", "http://localhost/artifact/1/some/file", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/artifact/1/some/file", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -344,7 +344,7 @@ func TestMkdirFsImplSafeResolve(t *testing.T) {
 func TestDownloadArtifactFileUnsafePath(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{
 		"artifact/server/path/some/file": {
 			Data: []byte("content"),
 		},
@@ -353,7 +353,7 @@ func TestDownloadArtifactFileUnsafePath(t *testing.T) {
 	router := httprouter.New()
 	downloads(router, "artifact/server/path", memfs)
 
-	req, _ := http.NewRequest("GET", "http://localhost/artifact/2/../../some/file", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/artifact/2/../../some/file", nil)
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -370,12 +370,12 @@ func TestDownloadArtifactFileUnsafePath(t *testing.T) {
 func TestArtifactUploadBlobUnsafePath(t *testing.T) {
 	assert := assert.New(t)
 
-	var memfs = fstest.MapFS(map[string]*fstest.MapFile{})
+	memfs := fstest.MapFS(map[string]*fstest.MapFile{})
 
 	router := httprouter.New()
 	uploads(router, "artifact/server/path", writeMapFS{memfs})
 
-	req, _ := http.NewRequest("PUT", "http://localhost/upload/1?itemPath=../../some/file", strings.NewReader("content"))
+	req, _ := http.NewRequest(http.MethodPut, "http://localhost/upload/1?itemPath=../../some/file", strings.NewReader("content"))
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)

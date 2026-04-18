@@ -3,6 +3,7 @@ package filecollector
 import (
 	"archive/tar"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -97,8 +98,7 @@ type Fs interface {
 	Readlink(path string) (string, error)
 }
 
-type DefaultFs struct {
-}
+type DefaultFs struct{}
 
 func (*DefaultFs) Walk(root string, fn filepath.WalkFunc) error {
 	return filepath.Walk(root, fn)
@@ -124,7 +124,7 @@ func (*DefaultFs) Readlink(path string) (string, error) {
 	return os.Readlink(path)
 }
 
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func (fc *FileCollector) CollectFiles(ctx context.Context, submodulePath []string) filepath.WalkFunc {
 	i, _ := fc.Fs.OpenGitIndex(path.Join(fc.SrcPath, path.Join(submodulePath...)))
 	return func(file string, fi os.FileInfo, err error) error {
@@ -134,7 +134,7 @@ func (fc *FileCollector) CollectFiles(ctx context.Context, submodulePath []strin
 		if ctx != nil {
 			select {
 			case <-ctx.Done():
-				return fmt.Errorf("copy cancelled")
+				return errors.New("copy cancelled")
 			default:
 			}
 		}

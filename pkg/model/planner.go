@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -8,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -57,7 +58,7 @@ type WorkflowFiles struct {
 
 // NewWorkflowPlanner will load a specific workflow, all workflows from a directory or all workflows from a directory and its subdirectories
 //
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func NewWorkflowPlanner(path string, noWorkflowRecurse bool) (WorkflowPlanner, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
@@ -114,9 +115,6 @@ func NewWorkflowPlanner(path string, noWorkflowRecurse bool) (WorkflowPlanner, e
 			dirPath:          dirname,
 			workflowDirEntry: fs.FileInfoToDirEntry(fi),
 		})
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	wp := new(workflowPlanner)
@@ -288,11 +286,8 @@ func (wp *workflowPlanner) GetEvents() []string {
 	for _, w := range wp.workflows {
 		found := false
 		for _, e := range events {
-			for _, we := range w.On() {
-				if e == we {
-					found = true
-					break
-				}
+			if slices.Contains(w.On(), e) {
+				found = true
 			}
 			if found {
 				break
@@ -305,9 +300,7 @@ func (wp *workflowPlanner) GetEvents() []string {
 	}
 
 	// sort the list based on depth of dependencies
-	sort.Slice(events, func(i, j int) bool {
-		return events[i] < events[j]
-	})
+	slices.Sort(events)
 
 	return events
 }
@@ -338,7 +331,7 @@ func (s *Stage) GetJobIDs() []string {
 // Merge stages with existing stages in plan
 func (p *Plan) mergeStages(stages []*Stage) {
 	newStages := make([]*Stage, int(math.Max(float64(len(p.Stages)), float64(len(stages)))))
-	for i := 0; i < len(newStages); i++ {
+	for i := range newStages {
 		newStages[i] = new(Stage)
 		if i >= len(p.Stages) {
 			newStages[i].Runs = append(newStages[i].Runs, stages[i].Runs...)
@@ -390,7 +383,7 @@ func createStages(w *Workflow, jobIDs ...string) ([]*Stage, error) {
 	}
 
 	if len(stages) == 0 {
-		return nil, fmt.Errorf("Could not find any stages to run. View the valid jobs with `act --list`. Use `act --help` to find how to filter by Job ID/Workflow/Event Name")
+		return nil, errors.New("Could not find any stages to run. View the valid jobs with `act --list`. Use `act --help` to find how to filter by Job ID/Workflow/Event Name")
 	}
 
 	return stages, nil

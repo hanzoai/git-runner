@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nektos/act/pkg/model"
+
 	"github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v4"
 )
@@ -38,7 +39,7 @@ func TestMaxParallelStrategy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matrix := map[string][]interface{}{
+			matrix := map[string][]any{
 				"version": {1, 2, 3, 4, 5},
 			}
 

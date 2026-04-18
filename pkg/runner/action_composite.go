@@ -2,8 +2,9 @@ package runner
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/nektos/act/pkg/common"
@@ -25,7 +26,7 @@ func evaluateCompositeInputAndEnv(ctx context.Context, parent *RunContext, step 
 
 	for inputID, input := range step.getActionModel().Inputs {
 		envKey := regexp.MustCompile("[^A-Z0-9-]").ReplaceAllString(strings.ToUpper(inputID), "_")
-		envKey = fmt.Sprintf("INPUT_%s", strings.ToUpper(envKey))
+		envKey = "INPUT_" + strings.ToUpper(envKey)
 
 		// lookup if key is defined in the step but the already
 		// evaluated value from the environment
@@ -90,7 +91,7 @@ func execAsComposite(step actionStep) common.Executor {
 		steps := step.getCompositeSteps()
 
 		if steps == nil || steps.main == nil {
-			return fmt.Errorf("missing steps in composite action")
+			return errors.New("missing steps in composite action")
 		}
 
 		ctx = WithCompositeLogger(ctx, &compositeRC.Masks)
@@ -138,7 +139,7 @@ func (rc *RunContext) compositeExecutor(action *model.Action) *compositeSteps {
 
 	for i, step := range action.Runs.Steps {
 		if step.ID == "" {
-			step.ID = fmt.Sprintf("%d", i)
+			step.ID = strconv.Itoa(i)
 		}
 		step.Number = i
 

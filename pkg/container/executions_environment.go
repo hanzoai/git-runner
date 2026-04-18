@@ -9,7 +9,7 @@ type ExecutionsEnvironment interface {
 	GetPathVariableName() string
 	DefaultPathVariable() string
 	JoinPathVariable(...string) string
-	GetRunnerContext(ctx context.Context) map[string]interface{}
+	GetRunnerContext(ctx context.Context) map[string]any
 	// On windows PATH and Path are the same key
 	IsEnvironmentCaseInsensitive() bool
 }

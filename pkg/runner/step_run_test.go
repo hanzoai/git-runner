@@ -6,11 +6,11 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestStepRun(t *testing.T) {

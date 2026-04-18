@@ -7,11 +7,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus/hooks/test"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSetEnv(t *testing.T) {
@@ -164,7 +164,7 @@ func TestAddmaskUsemask(t *testing.T) {
 
 	re := captureOutput(t, func() {
 		ctx := context.Background()
-		ctx = WithJobLogger(ctx, "0", "testjob", config, &rc.Masks, map[string]interface{}{})
+		ctx = WithJobLogger(ctx, "0", "testjob", config, &rc.Masks, map[string]any{})
 
 		handler := rc.commandHandler(ctx)
 		handler("::add-mask::secret\n")

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	maps0 "maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,20 +19,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/go-connections/nat"
-	"github.com/opencontainers/selinux/go-selinux"
-
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
+
+	"github.com/docker/go-connections/nat"
+	"github.com/opencontainers/selinux/go-selinux"
 )
 
 // RunContext contains info about current job
 type RunContext struct {
 	Name                string
 	Config              *Config
-	Matrix              map[string]interface{}
+	Matrix              map[string]any
 	Run                 *model.Run
 	EventJSON           string
 	Env                 map[string]string
@@ -100,19 +101,6 @@ func (rc *RunContext) jobContainerName() string {
 	return createSimpleContainerName(nameParts...) // For Gitea
 }
 
-// Deprecated: use `networkNameForGitea`
-// networkName return the name of the network which will be created by `act` automatically for job,
-// only create network if using a service container
-func (rc *RunContext) networkName() (string, bool) {
-	if len(rc.Run.Job().Services) > 0 {
-		return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
-	}
-	if rc.Config.ContainerNetworkMode == "" {
-		return "host", false
-	}
-	return string(rc.Config.ContainerNetworkMode), false
-}
-
 // networkNameForGitea return the name of the network
 func (rc *RunContext) networkNameForGitea() (string, bool) {
 	if rc.Config.ContainerNetworkMode != "" {
@@ -122,13 +110,13 @@ func (rc *RunContext) networkNameForGitea() (string, bool) {
 }
 
 func getDockerDaemonSocketMountPath(daemonPath string) string {
-	if protoIndex := strings.Index(daemonPath, "://"); protoIndex != -1 {
-		scheme := daemonPath[:protoIndex]
+	if before, after, ok := strings.Cut(daemonPath, "://"); ok {
+		scheme := before
 		if strings.EqualFold(scheme, "npipe") {
 			// linux container mount on windows, use the default socket path of the VM / wsl2
 			return "/var/run/docker.sock"
 		} else if strings.EqualFold(scheme, "unix") {
-			return daemonPath[protoIndex+3:]
+			return after
 		} else if strings.IndexFunc(scheme, func(r rune) bool {
 			return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z')
 		}) == -1 {
@@ -242,7 +230,7 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		rc.cleanUpJobContainer = rc.JobContainer.Remove()
 		for k, v := range rc.JobContainer.GetRunnerContext(ctx) {
 			if v, ok := v.(string); ok {
-				rc.Env[fmt.Sprintf("RUNNER_%s", strings.ToUpper(k))] = v
+				rc.Env["RUNNER_"+strings.ToUpper(k)] = v
 			}
 		}
 		for _, env := range os.Environ() {
@@ -268,7 +256,7 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 	}
 }
 
-//nolint:gocyclo
+//nolint:gocyclo // function handles many cases
 func (rc *RunContext) startJobContainer() common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
@@ -404,15 +392,8 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			return nil
 		}
 
-		jobContainerNetwork := rc.Config.ContainerNetworkMode.NetworkName()
-		if rc.containerImage(ctx) != "" {
-			jobContainerNetwork = networkName
-		} else if jobContainerNetwork == "" {
-			jobContainerNetwork = "host"
-		}
-
 		// For Gitea, `jobContainerNetwork` should be the same as `networkName`
-		jobContainerNetwork = networkName
+		jobContainerNetwork := networkName
 
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
 			Cmd:            nil,
@@ -468,7 +449,7 @@ func (rc *RunContext) execJobContainer(cmd []string, env map[string]string, user
 }
 
 func (rc *RunContext) ApplyExtraPath(ctx context.Context, env *map[string]string) {
-	if rc.ExtraPath != nil && len(rc.ExtraPath) > 0 {
+	if len(rc.ExtraPath) > 0 {
 		path := rc.JobContainer.GetPathVariableName()
 		if rc.JobContainer.IsEnvironmentCaseInsensitive() {
 			// On windows system Path and PATH could also be in the map
@@ -627,7 +608,7 @@ func (rc *RunContext) closeContainer() common.Executor {
 	}
 }
 
-func (rc *RunContext) matrix() map[string]interface{} {
+func (rc *RunContext) matrix() map[string]any {
 	return rc.Matrix
 }
 
@@ -642,7 +623,7 @@ func (rc *RunContext) steps() []*model.Step {
 // Executor returns a pipeline executor for all the steps in the job
 func (rc *RunContext) Executor() (common.Executor, error) {
 	var executor common.Executor
-	var jobType, err = rc.Run.Job().Type()
+	jobType, err := rc.Run.Job().Type()
 
 	switch jobType {
 	case model.JobTypeDefault:
@@ -779,14 +760,12 @@ func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {
 func mergeMaps(maps ...map[string]string) map[string]string {
 	rtnMap := make(map[string]string)
 	for _, m := range maps {
-		for k, v := range m {
-			rtnMap[k] = v
-		}
+		maps0.Copy(rtnMap, m)
 	}
 	return rtnMap
 }
 
-// deprecated: use createSimpleContainerName
+// Deprecated: use createSimpleContainerName
 func createContainerName(parts ...string) string {
 	name := strings.Join(parts, "-")
 	pattern := regexp.MustCompile("[^a-zA-Z0-9]")
@@ -843,10 +822,11 @@ func (rc *RunContext) getStepsContext() map[string]*model.StepResult {
 	return rc.StepResults
 }
 
+//nolint:gocyclo // function handles many cases
 func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext {
 	logger := common.Logger(ctx)
 	ghc := &model.GithubContext{
-		Event:            make(map[string]interface{}),
+		Event:            make(map[string]any),
 		Workflow:         rc.Run.Workflow.Name,
 		RunID:            rc.Config.Env["GITHUB_RUN_ID"],
 		RunNumber:        rc.Config.Env["GITHUB_RUN_NUMBER"],
@@ -954,7 +934,7 @@ func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext
 	ghc.GraphQLURL = "https://api.github.com/graphql"
 	// per GHES
 	if rc.Config.GitHubInstance != "github.com" {
-		ghc.ServerURL = fmt.Sprintf("https://%s", rc.Config.GitHubInstance)
+		ghc.ServerURL = "https://" + rc.Config.GitHubInstance
 		ghc.APIURL = fmt.Sprintf("https://%s/api/v3", rc.Config.GitHubInstance)
 		ghc.GraphQLURL = fmt.Sprintf("https://%s/api/graphql", rc.Config.GitHubInstance)
 	}
@@ -1010,7 +990,7 @@ func isLocalCheckout(ghc *model.GithubContext, step *model.Step) bool {
 	return true
 }
 
-func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) {
+func nestedMapLookup(m map[string]any, ks ...string) (rval any) {
 	var ok bool
 
 	if len(ks) == 0 { // degenerate input
@@ -1020,7 +1000,7 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 		return nil
 	} else if len(ks) == 1 { // we've reached the final key
 		return rval
-	} else if m, ok = rval.(map[string]interface{}); !ok {
+	} else if m, ok = rval.(map[string]any); !ok {
 		return nil
 	} else { // 1+ more keys
 		return nestedMapLookup(m, ks[1:]...)
@@ -1113,22 +1093,22 @@ func (rc *RunContext) handleCredentials(ctx context.Context) (string, string, er
 	}
 
 	if container.Credentials != nil && len(container.Credentials) != 2 {
-		err := fmt.Errorf("invalid property count for key 'credentials:'")
+		err := errors.New("invalid property count for key 'credentials:'")
 		return "", "", err
 	}
 
 	ee := rc.NewExpressionEvaluator(ctx)
 	if username = ee.Interpolate(ctx, container.Credentials["username"]); username == "" {
-		err := fmt.Errorf("failed to interpolate container.credentials.username")
+		err := errors.New("failed to interpolate container.credentials.username")
 		return "", "", err
 	}
 	if password = ee.Interpolate(ctx, container.Credentials["password"]); password == "" {
-		err := fmt.Errorf("failed to interpolate container.credentials.password")
+		err := errors.New("failed to interpolate container.credentials.password")
 		return "", "", err
 	}
 
 	if container.Credentials["username"] == "" || container.Credentials["password"] == "" {
-		err := fmt.Errorf("container.credentials cannot be empty")
+		err := errors.New("container.credentials cannot be empty")
 		return "", "", err
 	}
 
@@ -1137,25 +1117,25 @@ func (rc *RunContext) handleCredentials(ctx context.Context) (string, string, er
 
 func (rc *RunContext) handleServiceCredentials(ctx context.Context, creds map[string]string) (username, password string, err error) {
 	if creds == nil {
-		return
+		return username, password, err
 	}
 	if len(creds) != 2 {
-		err = fmt.Errorf("invalid property count for key 'credentials:'")
-		return
+		err = errors.New("invalid property count for key 'credentials:'")
+		return username, password, err
 	}
 
 	ee := rc.NewExpressionEvaluator(ctx)
 	if username = ee.Interpolate(ctx, creds["username"]); username == "" {
-		err = fmt.Errorf("failed to interpolate credentials.username")
-		return
+		err = errors.New("failed to interpolate credentials.username")
+		return username, password, err
 	}
 
 	if password = ee.Interpolate(ctx, creds["password"]); password == "" {
-		err = fmt.Errorf("failed to interpolate credentials.password")
-		return
+		err = errors.New("failed to interpolate credentials.password")
+		return username, password, err
 	}
 
-	return
+	return username, password, err
 }
 
 // GetServiceBindsAndMounts returns the binds and mounts for the service container, resolving paths as appopriate

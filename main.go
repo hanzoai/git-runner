@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/nektos/act/cmd"
+
+	_ "embed"
 )
 
 //go:embed VERSION

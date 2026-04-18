@@ -31,22 +31,17 @@ func TestContainerPath(t *testing.T) {
 		for _, v := range []containerPathJob{
 			{"/mnt/c/Users/act/go/src/github.com/nektos/act", "C:\\Users\\act\\go\\src\\github.com\\nektos\\act\\", ""},
 			{"/mnt/f/work/dir", `F:\work\dir`, ""},
-			{"/mnt/c/windows/to/unix", "windows\\to\\unix", fmt.Sprintf("%s\\", rootDrive)},
-			{fmt.Sprintf("/mnt/%v/act", rootDriveLetter), "act", fmt.Sprintf("%s\\", rootDrive)},
+			{"/mnt/c/windows/to/unix", "windows\\to\\unix", rootDrive + "\\"},
+			{fmt.Sprintf("/mnt/%v/act", rootDriveLetter), "act", rootDrive + "\\"},
 		} {
 			if v.workDir != "" {
-				if err := os.Chdir(v.workDir); err != nil {
-					log.Error(err)
-					t.Fail()
-				}
+				t.Chdir(v.workDir)
 			}
 
 			assert.Equal(t, v.destinationPath, linuxcontainerext.ToContainerPath(v.sourcePath))
 		}
 
-		if err := os.Chdir(cwd); err != nil {
-			log.Error(err)
-		}
+		t.Chdir(cwd)
 	} else {
 		cwd, err := os.Getwd()
 		if err != nil {

@@ -15,14 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/filecollector"
+	"github.com/nektos/act/pkg/lookpath"
+
 	"github.com/go-git/go-billy/v5/helper/polyfill"
 	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"golang.org/x/term"
-
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/filecollector"
-	"github.com/nektos/act/pkg/lookpath"
 )
 
 type HostEnvironment struct {
@@ -35,7 +35,7 @@ type HostEnvironment struct {
 	StdOut    io.Writer
 }
 
-func (e *HostEnvironment) Create(_ []string, _ []string) common.Executor {
+func (e *HostEnvironment) Create(_, _ []string) common.Executor {
 	return func(ctx context.Context) error {
 		return nil
 	}
@@ -86,7 +86,7 @@ func (e *HostEnvironment) CopyTarStream(ctx context.Context, destPath string, ta
 			continue
 		}
 		if ctx.Err() != nil {
-			return fmt.Errorf("CopyTarStream has been cancelled")
+			return errors.New("CopyTarStream has been cancelled")
 		}
 		if err := cp.WriteFile(ti.Name, ti.FileInfo(), ti.Linkname, tr); err != nil {
 			return err
@@ -94,7 +94,7 @@ func (e *HostEnvironment) CopyTarStream(ctx context.Context, destPath string, ta
 	}
 }
 
-func (e *HostEnvironment) CopyDir(destPath string, srcPath string, useGitIgnore bool) common.Executor {
+func (e *HostEnvironment) CopyDir(destPath, srcPath string, useGitIgnore bool) common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
 		srcPrefix := filepath.Dir(srcPath)
@@ -227,7 +227,7 @@ func (l *localEnv) Getenv(name string) string {
 func lookupPathHost(cmd string, env map[string]string, writer io.Writer) (string, error) {
 	f, err := lookpath.LookPath2(cmd, &localEnv{env: env})
 	if err != nil {
-		err := "Cannot find: " + fmt.Sprint(cmd) + " in PATH"
+		err := "Cannot find: " + cmd + " in PATH"
 		if _, _err := writer.Write([]byte(err + "\n")); _err != nil {
 			return "", fmt.Errorf("%v: %w", err, _err)
 		}
@@ -346,7 +346,7 @@ func (e *HostEnvironment) exec(ctx context.Context, command []string, cmdline st
 	}
 	if tty != nil {
 		writer.AutoStop = true
-		if _, err := tty.Write([]byte("\x04")); err != nil {
+		if _, err := tty.WriteString("\x04"); err != nil {
 			common.Logger(ctx).Debug("Failed to write EOT")
 		}
 	}
@@ -408,9 +408,10 @@ func (e *HostEnvironment) GetActPath() string {
 }
 
 func (*HostEnvironment) GetPathVariableName() string {
-	if runtime.GOOS == "plan9" {
+	switch runtime.GOOS {
+	case "plan9":
 		return "path"
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		return "Path" // Actually we need a case insensitive map
 	}
 	return "PATH"
@@ -449,8 +450,8 @@ func goOsToActionOs(os string) string {
 	return os
 }
 
-func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]interface{} {
-	return map[string]interface{}{
+func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]any {
+	return map[string]any{
 		"os":         goOsToActionOs(runtime.GOOS),
 		"arch":       goArchToActionArch(runtime.GOARCH),
 		"temp":       e.TmpDir,
@@ -458,7 +459,7 @@ func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]interfa
 	}
 }
 
-func (e *HostEnvironment) ReplaceLogWriter(stdout io.Writer, _ io.Writer) (io.Writer, io.Writer) {
+func (e *HostEnvironment) ReplaceLogWriter(stdout, _ io.Writer) (io.Writer, io.Writer) {
 	org := e.StdOut
 	e.StdOut = stdout
 	return org, org

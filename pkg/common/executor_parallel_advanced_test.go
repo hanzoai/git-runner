@@ -13,21 +13,21 @@ import (
 // TestMaxParallelJobExecution tests actual job execution with max-parallel
 func TestMaxParallelJobExecution(t *testing.T) {
 	t.Run("MaxParallel=1 Sequential", func(t *testing.T) {
-		var currentRunning int32
+		var currentRunning atomic.Int32
 		var maxConcurrent int32
 		var executionOrder []int
 		var mu sync.Mutex
 
 		executors := make([]Executor, 5)
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			taskID := i
 			executors[i] = func(ctx context.Context) error {
-				current := atomic.AddInt32(&currentRunning, 1)
+				current := currentRunning.Add(1)
 
 				// Track max concurrent
 				for {
-					max := atomic.LoadInt32(&maxConcurrent)
-					if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+					maxValue := atomic.LoadInt32(&maxConcurrent)
+					if current <= maxValue || atomic.CompareAndSwapInt32(&maxConcurrent, maxValue, current) {
 						break
 					}
 				}
@@ -37,7 +37,7 @@ func TestMaxParallelJobExecution(t *testing.T) {
 				mu.Unlock()
 
 				time.Sleep(10 * time.Millisecond)
-				atomic.AddInt32(&currentRunning, -1)
+				currentRunning.Add(-1)
 				return nil
 			}
 		}
@@ -51,23 +51,23 @@ func TestMaxParallelJobExecution(t *testing.T) {
 	})
 
 	t.Run("MaxParallel=3 Limited", func(t *testing.T) {
-		var currentRunning int32
+		var currentRunning atomic.Int32
 		var maxConcurrent int32
 
 		executors := make([]Executor, 10)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			executors[i] = func(ctx context.Context) error {
-				current := atomic.AddInt32(&currentRunning, 1)
+				current := currentRunning.Add(1)
 
 				for {
-					max := atomic.LoadInt32(&maxConcurrent)
-					if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+					maxValue := atomic.LoadInt32(&maxConcurrent)
+					if current <= maxValue || atomic.CompareAndSwapInt32(&maxConcurrent, maxValue, current) {
 						break
 					}
 				}
 
 				time.Sleep(20 * time.Millisecond)
-				atomic.AddInt32(&currentRunning, -1)
+				currentRunning.Add(-1)
 				return nil
 			}
 		}
@@ -82,22 +82,22 @@ func TestMaxParallelJobExecution(t *testing.T) {
 
 	t.Run("MaxParallel=0 Uses1Worker", func(t *testing.T) {
 		var maxConcurrent int32
-		var currentRunning int32
+		var currentRunning atomic.Int32
 
 		executors := make([]Executor, 5)
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			executors[i] = func(ctx context.Context) error {
-				current := atomic.AddInt32(&currentRunning, 1)
+				current := currentRunning.Add(1)
 
 				for {
-					max := atomic.LoadInt32(&maxConcurrent)
-					if current <= max || atomic.CompareAndSwapInt32(&maxConcurrent, max, current) {
+					maxValue := atomic.LoadInt32(&maxConcurrent)
+					if current <= maxValue || atomic.CompareAndSwapInt32(&maxConcurrent, maxValue, current) {
 						break
 					}
 				}
 
 				time.Sleep(10 * time.Millisecond)
-				atomic.AddInt32(&currentRunning, -1)
+				currentRunning.Add(-1)
 				return nil
 			}
 		}
@@ -117,7 +117,7 @@ func TestMaxParallelWithErrors(t *testing.T) {
 		var successCount int32
 
 		executors := make([]Executor, 5)
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			taskID := i
 			executors[i] = func(ctx context.Context) error {
 				if taskID == 2 {
@@ -143,7 +143,7 @@ func TestMaxParallelWithErrors(t *testing.T) {
 
 		var startedCount int32
 		executors := make([]Executor, 10)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			executors[i] = func(ctx context.Context) error {
 				atomic.AddInt32(&startedCount, 1)
 				time.Sleep(100 * time.Millisecond)
@@ -175,7 +175,7 @@ func TestMaxParallelPerformance(t *testing.T) {
 
 	t.Run("ParallelFasterThanSequential", func(t *testing.T) {
 		executors := make([]Executor, 10)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			executors[i] = func(ctx context.Context) error {
 				time.Sleep(50 * time.Millisecond)
 				return nil
@@ -203,7 +203,7 @@ func TestMaxParallelPerformance(t *testing.T) {
 
 	t.Run("OptimalWorkerCount", func(t *testing.T) {
 		executors := make([]Executor, 20)
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			executors[i] = func(ctx context.Context) error {
 				time.Sleep(10 * time.Millisecond)
 				return nil
@@ -236,7 +236,7 @@ func TestMaxParallelResourceSharing(t *testing.T) {
 		var mu sync.Mutex
 
 		executors := make([]Executor, 100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			executors[i] = func(ctx context.Context) error {
 				mu.Lock()
 				sharedCounter++
@@ -256,7 +256,7 @@ func TestMaxParallelResourceSharing(t *testing.T) {
 		resultChan := make(chan int, 50)
 
 		executors := make([]Executor, 50)
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			taskID := i
 			executors[i] = func(ctx context.Context) error {
 				resultChan <- taskID

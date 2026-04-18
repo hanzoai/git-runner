@@ -430,24 +430,24 @@ func TestReadWorkflow_Strategy(t *testing.T) {
 	job := wf.Jobs["strategy-only-max-parallel"]
 	matrixes, err := job.GetMatrixes()
 	assert.NoError(t, err)
-	assert.Equal(t, matrixes, []map[string]interface{}{{}})
-	assert.Equal(t, job.Matrix(), map[string][]interface{}(nil))
+	assert.Equal(t, matrixes, []map[string]any{{}})
+	assert.Equal(t, job.Matrix(), map[string][]any(nil))
 	assert.Equal(t, job.Strategy.MaxParallel, 2)
 	assert.Equal(t, job.Strategy.FailFast, true)
 
 	job = wf.Jobs["strategy-only-fail-fast"]
 	matrixes, err = job.GetMatrixes()
 	assert.NoError(t, err)
-	assert.Equal(t, matrixes, []map[string]interface{}{{}})
-	assert.Equal(t, job.Matrix(), map[string][]interface{}(nil))
+	assert.Equal(t, matrixes, []map[string]any{{}})
+	assert.Equal(t, job.Matrix(), map[string][]any(nil))
 	assert.Equal(t, job.Strategy.MaxParallel, 4)
 	assert.Equal(t, job.Strategy.FailFast, false)
 
 	job = wf.Jobs["strategy-no-matrix"]
 	matrixes, err = job.GetMatrixes()
 	assert.NoError(t, err)
-	assert.Equal(t, matrixes, []map[string]interface{}{{}})
-	assert.Equal(t, job.Matrix(), map[string][]interface{}(nil))
+	assert.Equal(t, matrixes, []map[string]any{{}})
+	assert.Equal(t, job.Matrix(), map[string][]any(nil))
 	assert.Equal(t, job.Strategy.MaxParallel, 2)
 	assert.Equal(t, job.Strategy.FailFast, false)
 
@@ -455,7 +455,7 @@ func TestReadWorkflow_Strategy(t *testing.T) {
 	matrixes, err = job.GetMatrixes()
 	assert.NoError(t, err)
 	assert.Equal(t, matrixes,
-		[]map[string]interface{}{
+		[]map[string]any{
 			{"datacenter": "site-c", "node-version": "14.x", "site": "staging"},
 			{"datacenter": "site-c", "node-version": "16.x", "site": "staging"},
 			{"datacenter": "site-d", "node-version": "16.x", "site": "staging"},
@@ -465,15 +465,15 @@ func TestReadWorkflow_Strategy(t *testing.T) {
 		},
 	)
 	assert.Equal(t, job.Matrix(),
-		map[string][]interface{}{
+		map[string][]any{
 			"datacenter": {"site-c", "site-d"},
 			"exclude": {
-				map[string]interface{}{"datacenter": "site-d", "node-version": "14.x", "site": "staging"},
+				map[string]any{"datacenter": "site-d", "node-version": "14.x", "site": "staging"},
 			},
 			"include": {
-				map[string]interface{}{"php-version": 5.4},
-				map[string]interface{}{"datacenter": "site-a", "node-version": "10.x", "site": "prod"},
-				map[string]interface{}{"datacenter": "site-b", "node-version": "12.x", "site": "dev"},
+				map[string]any{"php-version": 5.4},
+				map[string]any{"datacenter": "site-a", "node-version": "10.x", "site": "prod"},
+				map[string]any{"datacenter": "site-b", "node-version": "12.x", "site": "dev"},
 			},
 			"node-version": {"14.x", "16.x"},
 			"site":         {"staging"},

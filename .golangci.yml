@@ -1,51 +1,146 @@
-# Minimum golangci-lint version required: v1.46.0
-run:
-  timeout: 3m
-
-skip-dirs:
-  - report # megalinter results+fixes
-
-linters-settings:
-  gocyclo:
-    # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 15
-  gocritic:
-    disabled-checks:
-      - ifElseChain
-  importas:
-    aliases:
-      - pkg: 'github.com/sirupsen/logrus'
-        alias: log
-      - pkg: 'github.com/stretchr/testify/assert'
-        alias: assert
-  depguard:
-    rules:
-      main:
-        deny:
-          - pkg: github.com/pkg/errors
-            desc: Please use "errors" package from standard library
-          - pkg: gotest.tools/v3
-            desc: Please keep tests unified using only github.com/stretchr/testify
-          - pkg: log
-            desc: Please keep logging unified using only github.com/sirupsen/logrus
+version: "2"
+output:
+  sort-order:
+    - file
 linters:
+  default: none
   enable:
-    - megacheck
-    - govet
-    - revive
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - depguard
+    - dupl
+    - errcheck
+    - gocheckcompilerdirectives
+    - gocritic
     - gocyclo
     - gosec
-    - unconvert
-    - dupl
-    - nakedret
-    - prealloc
-    - exportloopref
-    - gocritic
-    - goimports
-    - whitespace
-    - misspell
-    - depguard
+    - govet
     - importas
-    - contextcheck
+    - ineffassign
+    - misspell
+    - mirror
+    - modernize
+    - nakedret
     - nolintlint
+    - perfsprint
     - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: Please use "errors" package from standard library
+            - pkg: gotest.tools/v3
+              desc: Please keep tests unified using only github.com/stretchr/testify
+            - pkg: log
+              desc: Please keep logging unified using only github.com/sirupsen/logrus
+    gocyclo:
+      min-complexity: 15
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+    importas:
+      alias:
+        - pkg: github.com/sirupsen/logrus
+          alias: log
+        - pkg: github.com/stretchr/testify/assert
+          alias: assert
+    nolintlint:
+      allow-unused: false
+      require-explanation: true
+      require-specific: true
+    revive:
+      severity: error
+      rules:
+        - name: blank-imports
+        - name: constant-logical-expr
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-lines
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: identical-branches
+        - name: if-return
+        - name: increment-decrement
+        - name: modifies-value-receiver
+        - name: package-comments
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+    staticcheck:
+      checks:
+        - all
+        - -ST1003
+        - -ST1005
+        - -QF1001
+        - -QF1006
+        - -QF1008
+    usetesting:
+      os-temp-dir: true
+    perfsprint:
+      concat-loop: false
+    govet:
+      enable:
+        - nilness
+        - unusedwrite
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - bodyclose
+          - dupl
+          - errcheck
+          - gosec
+          - staticcheck
+        path: _test\.go
+      - linters:
+          - gosec
+        text: 'G115:'
+      - linters:
+          - gosec
+        text: 'G117:'
+    paths:
+      - report
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofumpt
+  settings:
+    gci:
+      custom-order: true
+      sections:
+        - standard
+        - prefix(github.com/nektos/act)
+        - blank
+        - default
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - report
+
+run:
+  timeout: 10m

@@ -5,9 +5,9 @@ package container
 import (
 	"context"
 
-	"github.com/docker/docker/api/types"
-
 	"github.com/nektos/act/pkg/common"
+
+	"github.com/docker/docker/api/types"
 )
 
 func NewDockerNetworkCreateExecutor(name string) common.Executor {

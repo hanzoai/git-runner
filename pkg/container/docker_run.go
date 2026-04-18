@@ -16,6 +16,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/filecollector"
+
 	"github.com/Masterminds/semver"
 	"github.com/docker/cli/cli/compose/loader"
 	"github.com/docker/cli/cli/connhelper"
@@ -23,7 +26,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	networktypes "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-git/go-billy/v5/helper/polyfill"
@@ -36,9 +38,6 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
-
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/filecollector"
 )
 
 // NewContainer creates a reference to a container
@@ -61,7 +60,7 @@ func (cr *containerReference) ConnectToNetwork(name string) common.Executor {
 
 func (cr *containerReference) connectToNetwork(name string, aliases []string) common.Executor {
 	return func(ctx context.Context) error {
-		return cr.cli.NetworkConnect(ctx, name, cr.input.Name, &networktypes.EndpointSettings{
+		return cr.cli.NetworkConnect(ctx, name, cr.input.Name, &network.EndpointSettings{
 			Aliases: aliases,
 		})
 	}
@@ -85,7 +84,7 @@ func supportsContainerImagePlatform(ctx context.Context, cli client.APIClient) b
 	return constraint.Check(sv)
 }
 
-func (cr *containerReference) Create(capAdd []string, capDrop []string) common.Executor {
+func (cr *containerReference) Create(capAdd, capDrop []string) common.Executor {
 	return common.
 		NewInfoExecutor("%sdocker create image=%s platform=%s entrypoint=%+q cmd=%+q network=%+q", logPrefix, cr.input.Image, cr.input.Platform, cr.input.Entrypoint, cr.input.Cmd, cr.input.NetworkMode).
 		Then(
@@ -142,7 +141,7 @@ func (cr *containerReference) Copy(destPath string, files ...*FileEntry) common.
 	).IfNot(common.Dryrun)
 }
 
-func (cr *containerReference) CopyDir(destPath string, srcPath string, useGitIgnore bool) common.Executor {
+func (cr *containerReference) CopyDir(destPath, srcPath string, useGitIgnore bool) common.Executor {
 	return common.NewPipelineExecutor(
 		common.NewInfoExecutor("%sdocker cp src=%s dst=%s", logPrefix, srcPath, destPath),
 		cr.copyDir(destPath, srcPath, useGitIgnore),
@@ -158,7 +157,7 @@ func (cr *containerReference) CopyDir(destPath string, srcPath string, useGitIgn
 
 func (cr *containerReference) GetContainerArchive(ctx context.Context, srcPath string) (io.ReadCloser, error) {
 	if common.Dryrun(ctx) {
-		return nil, fmt.Errorf("DRYRUN is not supported in GetContainerArchive")
+		return nil, errors.New("DRYRUN is not supported in GetContainerArchive")
 	}
 	a, _, err := cr.cli.CopyFromContainer(ctx, cr.id, srcPath)
 	return a, err
@@ -190,7 +189,7 @@ func (cr *containerReference) Remove() common.Executor {
 	).IfNot(common.Dryrun)
 }
 
-func (cr *containerReference) ReplaceLogWriter(stdout io.Writer, stderr io.Writer) (io.Writer, io.Writer) {
+func (cr *containerReference) ReplaceLogWriter(stdout, stderr io.Writer) (io.Writer, io.Writer) {
 	out := cr.input.Stdout
 	err := cr.input.Stderr
 
@@ -429,7 +428,7 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	return config, hostConfig, nil
 }
 
-func (cr *containerReference) create(capAdd []string, capDrop []string) common.Executor {
+func (cr *containerReference) create(capAdd, capDrop []string) common.Executor {
 	return func(ctx context.Context) error {
 		if cr.id != "" {
 			return nil
@@ -682,7 +681,7 @@ func (cr *containerReference) tryReadGID() common.Executor {
 	return cr.tryReadID("-g", func(id int) { cr.GID = id })
 }
 
-func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal bool, resp types.HijackedResponse, _ types.IDResponse, _ string, _ string) error {
+func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal bool, resp types.HijackedResponse, _ types.IDResponse, _, _ string) error {
 	logger := common.Logger(ctx)
 
 	cmdResponse := make(chan error)
@@ -753,7 +752,7 @@ func (cr *containerReference) CopyTarStream(ctx context.Context, destPath string
 	return nil
 }
 
-func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgnore bool) common.Executor {
+func (cr *containerReference) copyDir(dstPath, srcPath string, useGitIgnore bool) common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
 		tarFile, err := os.CreateTemp("", "act")
