@@ -21,6 +21,42 @@ Tags:
     - `nektos/v0.10.1` -> `v0.1001.*`, not ~~`v0.101.*`~~
     - `nektos/v0.3.100` -> not ~~`v0.3100.*`~~, I don't think it's really going to happen, if it does, we can find a way to handle it.
 
+## Gitea-specific changes
+
+### Matrix strategy: scalar values and template expressions
+
+This fork extends the matrix strategy parser [workflow.go](pkg/model/workflow.go) to accept
+bare scalar YAML values in addition to arrays, and to handle unevaluated template
+expressions gracefully.
+
+**Scalar wrapping**
+
+A matrix key written without brackets is automatically promoted to a
+single-element array:
+
+```yaml
+strategy:
+  matrix:
+    go-version: 1.21        # treated as [1.21]
+    os: ubuntu-latest       # treated as ["ubuntu-latest"]
+```
+
+> [!NOTE]
+> Previously such a value caused the matrix decoding to fail and the job ran *without*
+> a matrix context (`matrix.*` variables were undefined). Now the job runs *one* matrix iteration with the scalar as the
+> value. Existing workflows that used scalars by accident may see a difference in which matrix variables are populated.
+
+**Template expression support (`${{ fromJSON(...) }}`)**
+
+Template expressions in the matrix are resolved by `EvaluateYamlNode`
+(`pkg/runner/runner.go`) *before* `Matrix()` is called.  When successful, the
+expression is replaced by a proper YAML sequence and the matrix expands
+normally.
+
+If the expression cannot be resolved (e.g., the necessary context is not yet
+available), the literal string is wrapped as a one-element array, and the job
+runs once with the unexpanded string as the matrix value (graceful degradation).
+
 ---
 
 ![act-logo](https://raw.githubusercontent.com/wiki/nektos/act/img/logo-150.png)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestReadWorkflow_ScheduleEvent(t *testing.T) {
@@ -636,4 +637,268 @@ func TestStep_UsesHash(t *testing.T) {
 			assert.Equalf(t, tt.want, s.UsesHash(), "UsesHash()")
 		})
 	}
+}
+
+func TestNormalizeMatrixValue(t *testing.T) {
+	tests := []struct {
+		name       string
+		key        string
+		value      interface{}
+		wantResult []interface{}
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:       "array_values_pass_through",
+			key:        "version",
+			value:      []interface{}{"1.0", "2.0", "3.0"},
+			wantResult: []interface{}{"1.0", "2.0", "3.0"},
+			wantErr:    false,
+		},
+		{
+			name:       "string_scalar_wrapped",
+			key:        "os",
+			value:      "ubuntu-latest",
+			wantResult: []interface{}{"ubuntu-latest"},
+			wantErr:    false,
+		},
+		{
+			name:       "template_expression_wrapped",
+			key:        "version",
+			value:      "${{ fromJson(needs.setup.outputs.versions) }}",
+			wantResult: []interface{}{"${{ fromJson(needs.setup.outputs.versions) }}"},
+			wantErr:    false,
+		},
+		{
+			name:       "integer_scalar_wrapped",
+			key:        "count",
+			value:      42,
+			wantResult: []interface{}{42},
+			wantErr:    false,
+		},
+		{
+			name:       "float_scalar_wrapped",
+			key:        "factor",
+			value:      3.14,
+			wantResult: []interface{}{3.14},
+			wantErr:    false,
+		},
+		{
+			name:       "bool_scalar_wrapped",
+			key:        "enabled",
+			value:      true,
+			wantResult: []interface{}{true},
+			wantErr:    false,
+		},
+		{
+			name:       "nil_scalar_wrapped",
+			key:        "optional",
+			value:      nil,
+			wantResult: []interface{}{nil},
+			wantErr:    false,
+		},
+		{
+			name:    "nested_map_returns_error",
+			key:     "config",
+			value:   map[string]interface{}{"nested": "value"},
+			wantErr: true,
+			errMsg:  "has invalid nested object value",
+		},
+		{
+			name:       "empty_array_passes_through",
+			key:        "empty",
+			value:      []interface{}{},
+			wantResult: []interface{}{},
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := normalizeMatrixValue(tt.key, tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err, "should return error")
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				assert.NoError(t, err, "should not return error")
+				assert.Equal(t, tt.wantResult, result, "result should match expected")
+			}
+		})
+	}
+}
+
+func TestJobMatrix(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr bool
+		wantLen int
+		checkFn func(*testing.T, map[string][]interface{})
+	}{
+		{
+			name: "matrix_with_arrays",
+			yaml: `
+name: test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        version: [1.18, 1.19]
+    steps:
+      - run: echo test
+`,
+			wantErr: false,
+			wantLen: 2,
+			checkFn: func(t *testing.T, m map[string][]interface{}) {
+				assert.Equal(t, []interface{}{"ubuntu-latest", "windows-latest"}, m["os"])
+				assert.Equal(t, []interface{}{1.18, 1.19}, m["version"])
+			},
+		},
+		{
+			name: "matrix_with_scalar_values",
+			yaml: `
+name: test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ubuntu-latest
+        version: 1.19
+    steps:
+      - run: echo test
+`,
+			wantErr: false,
+			wantLen: 2,
+			checkFn: func(t *testing.T, m map[string][]interface{}) {
+				assert.Equal(t, []interface{}{"ubuntu-latest"}, m["os"])
+				assert.Equal(t, []interface{}{1.19}, m["version"])
+			},
+		},
+		{
+			name: "matrix_with_template_expression",
+			yaml: `
+name: test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        versions: ${{ fromJson(needs.setup.outputs.versions) }}
+    steps:
+      - run: echo test
+`,
+			wantErr: false,
+			wantLen: 1,
+			checkFn: func(t *testing.T, m map[string][]interface{}) {
+				assert.Equal(t, []interface{}{"${{ fromJson(needs.setup.outputs.versions) }}"}, m["versions"])
+			},
+		},
+		{
+			name: "matrix_mixed_arrays_and_scalars",
+			yaml: `
+name: test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        version: 1.19
+        node: [14, 16]
+    steps:
+      - run: echo test
+`,
+			wantErr: false,
+			wantLen: 3,
+			checkFn: func(t *testing.T, m map[string][]interface{}) {
+				assert.Equal(t, []interface{}{"ubuntu-latest", "windows-latest"}, m["os"])
+				assert.Equal(t, []interface{}{1.19}, m["version"])
+				assert.Equal(t, []interface{}{14, 16}, m["node"])
+			},
+		},
+		{
+			name: "empty_matrix",
+			yaml: `
+name: test
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test
+`,
+			wantErr: false,
+			wantLen: 0,
+			checkFn: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workflow, err := ReadWorkflow(strings.NewReader(tt.yaml))
+			assert.NoError(t, err, "reading workflow should succeed")
+
+			job := workflow.GetJob("build")
+			if job == nil {
+				// For empty matrix test
+				if tt.wantLen == 0 {
+					return
+				}
+				t.Fatal("job not found")
+			}
+
+			matrix := job.Matrix()
+
+			if tt.wantErr {
+				assert.Nil(t, matrix, "matrix should be nil on error")
+			} else {
+				if tt.wantLen == 0 {
+					assert.Nil(t, matrix, "matrix should be nil for jobs without strategy")
+				} else {
+					assert.NotNil(t, matrix, "matrix should not be nil")
+					assert.Equal(t, tt.wantLen, len(matrix), "matrix should have expected number of keys")
+					if tt.checkFn != nil {
+						tt.checkFn(t, matrix)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestJobMatrixValidation(t *testing.T) {
+	// This test verifies that invalid nested map values are caught
+	t.Run("matrix_with_nested_map_fails", func(t *testing.T) {
+		// Manually construct a job with a problematic matrix containing a nested map
+		job := &Job{
+			Strategy: &Strategy{
+				RawMatrix: yaml.Node{
+					Kind: yaml.MappingNode,
+					Content: []*yaml.Node{
+						{Kind: yaml.ScalarNode, Tag: "!!str", Value: "config"},
+						{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
+							{Kind: yaml.ScalarNode, Tag: "!!str", Value: "nested"},
+							{Kind: yaml.ScalarNode, Tag: "!!str", Value: "value"},
+						}},
+					},
+				},
+			},
+		}
+
+		// Attempt to get matrix
+		matrix := job.Matrix()
+
+		// Should return nil due to validation error
+		assert.Nil(t, matrix, "matrix with nested map should return nil")
+	})
 }

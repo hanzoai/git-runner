@@ -377,16 +377,61 @@ func (j *Job) Environment() map[string]string {
 	return environment(j.Env)
 }
 
-// Matrix decodes RawMatrix YAML node
+// normalizeMatrixValue converts a matrix value to []interface{}.
+// Arrays pass through unchanged; scalars are wrapped in a single-element array.
+// Unevaluated template expressions are wrapped as a fallback — proper resolution
+// happens via EvaluateYamlNode before Matrix() is called. Nested maps are rejected.
+func normalizeMatrixValue(key string, val any) ([]any, error) {
+	switch t := val.(type) {
+	case []any:
+		// Already an array - use as-is
+		return t, nil
+	case string, int, float64, bool, nil:
+		// Valid scalar types that can appear in YAML
+		// These can be unevaluated template expressions (strings) or literal values
+		return []any{t}, nil
+	case map[string]any:
+		// Nested map indicates misconfiguration - likely user error
+		return nil, fmt.Errorf("matrix key %q has invalid nested object value - expected scalar or array, got map", key)
+	default:
+		// Unknown types might indicate parsing issues
+		log.Warnf("matrix key %q has unexpected type %T, wrapping as single value", key, t)
+		return []any{t}, nil
+	}
+}
+
+// Matrix decodes the RawMatrix YAML node into a map[string][]interface{}.
+// Scalar values are wrapped into single-element arrays automatically.
+// Template expressions are resolved by EvaluateYamlNode before this method is
+// called; if unresolved, the literal string is wrapped as a one-element fallback.
 func (j *Job) Matrix() map[string][]any {
-	if j.Strategy.RawMatrix.Kind == yaml.MappingNode {
+	if j.Strategy == nil || j.Strategy.RawMatrix.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	// Decode to flexible map first so that scalar values don't cause a type error.
+	var flexVal map[string]any
+	err := j.Strategy.RawMatrix.Decode(&flexVal)
+	if err != nil {
+		// Fall back to the strict array-only format for backward compatibility.
 		var val map[string][]any
 		if !decodeNode(j.Strategy.RawMatrix, &val) {
 			return nil
 		}
 		return val
 	}
-	return nil
+
+	// Convert flexible format to expected format with validation
+	val := make(map[string][]any)
+	for k, v := range flexVal {
+		normalized, err := normalizeMatrixValue(k, v)
+		if err != nil {
+			log.Errorf("matrix validation error: %v", err)
+			return nil
+		}
+		val[k] = normalized
+	}
+	return val
 }
 
 // GetMatrixes returns the matrix cross product

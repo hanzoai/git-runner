@@ -179,6 +179,8 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 					log.Debugf("Job.Strategy.RawMatrix: %v", job.Strategy.RawMatrix)
 
 					strategyRc := runner.newRunContext(ctx, run, nil)
+					// Resolve template expressions in the matrix node before Matrix() is called.
+					// On failure the literal string is kept and normalizeMatrixValue wraps it as a fallback.
 					if err := strategyRc.NewExpressionEvaluator(ctx).EvaluateYamlNode(ctx, &job.Strategy.RawMatrix); err != nil {
 						log.Errorf("Error while evaluating matrix: %v", err)
 					}
