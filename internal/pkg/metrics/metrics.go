@@ -89,7 +89,7 @@ var (
 		Namespace: Namespace,
 		Subsystem: "poll",
 		Name:      "backoff_seconds",
-		Help:      "Last observed polling backoff interval. With Capacity > 1, reflects whichever worker wrote last.",
+		Help:      "Last observed polling backoff interval in seconds.",
 	})
 
 	JobsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{

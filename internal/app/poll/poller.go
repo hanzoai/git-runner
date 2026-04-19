@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/app/run"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/metrics"
@@ -22,9 +21,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// TaskRunner abstracts task execution so the poller can be tested
+// without a real runner.
+type TaskRunner interface {
+	Run(ctx context.Context, task *runnerv1.Task) error
+}
+
 type Poller struct {
 	client       client.Client
-	runner       *run.Runner
+	runner       TaskRunner
 	cfg          *config.Config
 	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the Gitea.
 
@@ -37,20 +42,19 @@ type Poller struct {
 	done chan struct{}
 }
 
-// workerState holds per-goroutine polling state. Backoff counters are
-// per-worker so that with Capacity > 1, N workers each seeing one empty
-// response don't combine into a "consecutive N empty" reading on a shared
-// counter and trigger an unnecessarily long backoff.
+// workerState holds the single poller's backoff state. Consecutive empty or
+// error responses drive exponential backoff; a successful task fetch resets
+// both counters so the next poll fires immediately.
 type workerState struct {
 	consecutiveEmpty  int64
 	consecutiveErrors int64
-	// lastBackoff is the last interval reported to the PollBackoffSeconds gauge
-	// from this worker; used to suppress redundant no-op Set calls when the
-	// backoff plateaus (e.g. at FetchIntervalMax).
+	// lastBackoff is the last interval reported to the PollBackoffSeconds gauge;
+	// used to suppress redundant no-op Set calls when the backoff plateaus
+	// (e.g. at FetchIntervalMax).
 	lastBackoff time.Duration
 }
 
-func New(cfg *config.Config, client client.Client, runner *run.Runner) *Poller {
+func New(cfg *config.Config, client client.Client, runner TaskRunner) *Poller {
 	pollingCtx, shutdownPolling := context.WithCancel(context.Background())
 
 	jobsCtx, shutdownJobs := context.WithCancel(context.Background())
@@ -73,22 +77,57 @@ func New(cfg *config.Config, client client.Client, runner *run.Runner) *Poller {
 }
 
 func (p *Poller) Poll() {
+	sem := make(chan struct{}, p.cfg.Runner.Capacity)
 	wg := &sync.WaitGroup{}
-	for i := 0; i < p.cfg.Runner.Capacity; i++ {
-		wg.Add(1)
-		go p.poll(wg)
-	}
-	wg.Wait()
+	s := &workerState{}
 
-	// signal that we shutdown
-	close(p.done)
+	defer func() {
+		wg.Wait()
+		close(p.done)
+	}()
+
+	for {
+		select {
+		case sem <- struct{}{}:
+		case <-p.pollingCtx.Done():
+			return
+		}
+
+		task, ok := p.fetchTask(p.pollingCtx, s)
+		if !ok {
+			<-sem
+			if !p.waitBackoff(s) {
+				return
+			}
+			continue
+		}
+
+		s.resetBackoff()
+
+		wg.Add(1)
+		go func(t *runnerv1.Task) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			p.runTaskWithRecover(p.jobsCtx, t)
+		}(task)
+	}
 }
 
 func (p *Poller) PollOnce() {
-	p.pollOnce(&workerState{})
-
-	// signal that we're done
-	close(p.done)
+	defer close(p.done)
+	s := &workerState{}
+	for {
+		task, ok := p.fetchTask(p.pollingCtx, s)
+		if !ok {
+			if !p.waitBackoff(s) {
+				return
+			}
+			continue
+		}
+		s.resetBackoff()
+		p.runTaskWithRecover(p.jobsCtx, task)
+		return
+	}
 }
 
 func (p *Poller) Shutdown(ctx context.Context) error {
@@ -101,13 +140,13 @@ func (p *Poller) Shutdown(ctx context.Context) error {
 
 	// our timeout for shutting down ran out
 	case <-ctx.Done():
-		// when both the timeout fires and the graceful shutdown
-		// completed succsfully, this branch of the select may
-		// fire. Do a non-blocking check here against the graceful
-		// shutdown status to avoid sending an error if we don't need to.
-		_, ok := <-p.done
-		if !ok {
+		// Both the timeout and the graceful shutdown may fire
+		// simultaneously. Do a non-blocking check to avoid forcing
+		// a shutdown when graceful already completed.
+		select {
+		case <-p.done:
 			return nil
+		default:
 		}
 
 		// force a shutdown of all running jobs
@@ -120,18 +159,27 @@ func (p *Poller) Shutdown(ctx context.Context) error {
 	}
 }
 
-func (p *Poller) poll(wg *sync.WaitGroup) {
-	defer wg.Done()
-	s := &workerState{}
-	for {
-		p.pollOnce(s)
+func (s *workerState) resetBackoff() {
+	s.consecutiveEmpty = 0
+	s.consecutiveErrors = 0
+	s.lastBackoff = 0
+}
 
-		select {
-		case <-p.pollingCtx.Done():
-			return
-		default:
-			continue
-		}
+// waitBackoff sleeps for the current backoff interval (with jitter).
+// Returns false if the polling context was cancelled during the wait.
+func (p *Poller) waitBackoff(s *workerState) bool {
+	base := p.calculateInterval(s)
+	if base != s.lastBackoff {
+		metrics.PollBackoffSeconds.Set(base.Seconds())
+		s.lastBackoff = base
+	}
+	timer := time.NewTimer(addJitter(base))
+	select {
+	case <-timer.C:
+		return true
+	case <-p.pollingCtx.Done():
+		timer.Stop()
+		return false
 	}
 }
 
@@ -165,34 +213,6 @@ func addJitter(d time.Duration) time.Duration {
 	}
 	jitter := rand.Int64N(jitterRange) - jitterRange/2
 	return d + time.Duration(jitter)
-}
-
-func (p *Poller) pollOnce(s *workerState) {
-	for {
-		task, ok := p.fetchTask(p.pollingCtx, s)
-		if !ok {
-			base := p.calculateInterval(s)
-			if base != s.lastBackoff {
-				metrics.PollBackoffSeconds.Set(base.Seconds())
-				s.lastBackoff = base
-			}
-			timer := time.NewTimer(addJitter(base))
-			select {
-			case <-timer.C:
-			case <-p.pollingCtx.Done():
-				timer.Stop()
-				return
-			}
-			continue
-		}
-
-		// Got a task — reset backoff counters for fast subsequent polling.
-		s.consecutiveEmpty = 0
-		s.consecutiveErrors = 0
-
-		p.runTaskWithRecover(p.jobsCtx, task)
-		return
-	}
 }
 
 func (p *Poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
