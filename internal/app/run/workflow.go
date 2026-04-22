@@ -9,8 +9,9 @@ import (
 	"sort"
 	"strings"
 
+	"gitea.com/gitea/act_runner/act/model"
+
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"github.com/nektos/act/pkg/model"
 	"go.yaml.in/yaml/v4"
 )
 

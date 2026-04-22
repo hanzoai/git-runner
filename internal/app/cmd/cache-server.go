@@ -8,9 +8,9 @@ import (
 	"os"
 	"os/signal"
 
+	"gitea.com/gitea/act_runner/act/artifactcache"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 
-	"github.com/nektos/act/pkg/artifactcache"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
