@@ -15,6 +15,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitea.com/gitea/act_runner/act/artifactcache"
+	"gitea.com/gitea/act_runner/act/common"
+	"gitea.com/gitea/act_runner/act/model"
+	"gitea.com/gitea/act_runner/act/runner"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/labels"
@@ -25,10 +29,6 @@ import (
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"connectrpc.com/connect"
 	"github.com/docker/docker/api/types/container"
-	"github.com/nektos/act/pkg/artifactcache"
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/runner"
 	log "github.com/sirupsen/logrus"
 )
 

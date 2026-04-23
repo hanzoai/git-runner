@@ -1,6 +1,6 @@
 # act runner
 
-Act runner is a runner for Gitea based on [Gitea fork](https://gitea.com/gitea/act) of [act](https://github.com/nektos/act).
+Act runner is a runner for Gitea.
 
 ## Installation
 
