@@ -69,10 +69,15 @@ endif
 TAGS ?=
 LDFLAGS ?= -X "gitea.com/gitea/act_runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
 
+.PHONY: all
 all: build
 
+.PHONY: help
+help: Makefile ## print Makefile help information.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m[TARGETS] default target: build\033[0m\n\n\033[35mTargets:\033[0m\n"} /^[0-9A-Za-z._-]+:.*?##/ { printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2 }' Makefile
+
 .PHONY: fmt
-fmt:
+fmt: ## format the Go code
 	$(GO) run $(GOLANGCI_LINT_PACKAGE) fmt
 
 .PHONY: go-check
@@ -103,7 +108,7 @@ deps-tools: ## install tool dependencies
 	wait
 
 .PHONY: lint
-lint: lint-go
+lint: lint-go ## lint everything
 
 .PHONY: lint-go
 lint-go: ## lint go files
@@ -118,7 +123,7 @@ security-check: deps-tools
 	GOEXPERIMENT= $(GO) run $(GOVULNCHECK_PACKAGE) -show color ./... || true
 
 .PHONY: tidy
-tidy:
+tidy: ## run go mod tidy
 	$(GO) mod tidy
 
 .PHONY: tidy-check
@@ -130,13 +135,16 @@ tidy-check: tidy
 		exit 1; \
 	fi
 
-test: fmt-check security-check
+.PHONY: test
+test: fmt-check security-check ## test everything
 	@$(GO) test -race -short -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
-install: $(GOFILES)
+.PHONY: install
+install: $(GOFILES) ## install the act_runner binary via `go install`
 	$(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)'
 
-build: go-check $(EXECUTABLE)
+.PHONY: build
+build: go-check $(EXECUTABLE) ## build the act_runner binary
 
 $(EXECUTABLE): $(GOFILES)
 	$(GO) build -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)' -o $@
@@ -146,7 +154,7 @@ deps-backend: ## install backend dependencies
 	$(GO) mod download
 
 .PHONY: release
-release: release-windows release-linux release-darwin release-copy release-compress release-check
+release: release-windows release-linux release-darwin release-copy release-compress release-check ## build release artifacts
 
 $(DIST_DIRS):
 	mkdir -p $(DIST_DIRS)
@@ -185,15 +193,17 @@ release-compress: | $(DIST_DIRS)
 	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && $(GO) run $(GXZ_PACKAGE) -k -9 $${file}; done;
 
 .PHONY: docker
-docker:
+docker: ## build the docker image
 	if ! docker buildx version >/dev/null 2>&1; then \
 		ARG_DISABLE_CONTENT_TRUST=--disable-content-trust=false; \
 	fi; \
 	docker build $${ARG_DISABLE_CONTENT_TRUST} -t $(DOCKER_REF) .
 
-clean:
+.PHONY: clean
+clean: ## delete binary and coverage files
 	$(GO) clean -x -i ./...
 	rm -rf coverage.txt $(EXECUTABLE) $(DIST)
 
-version:
+.PHONY: version
+version: ## print the version
 	@echo $(VERSION)
