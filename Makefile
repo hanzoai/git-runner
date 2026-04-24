@@ -6,7 +6,7 @@ SHASUM ?= shasum -a 256
 HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
 XGO_PACKAGE ?= src.techknowlogick.com/xgo@latest
 XGO_VERSION := go-1.26.x
-GXZ_PAGAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
+GXZ_PACKAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
 
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
@@ -21,10 +21,10 @@ DOCKER_ROOTLESS_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)-dind-rootless
 GOLANGCI_LINT_PACKAGE ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
 GOVULNCHECK_PACKAGE ?= golang.org/x/vuln/cmd/govulncheck@v1
 
-ifneq ($(shell uname), Darwin)
-	EXTLDFLAGS = -extldflags "-static" $(null)
-else
-	EXTLDFLAGS =
+STATIC ?=
+EXTLDFLAGS ?=
+ifneq ($(STATIC),)
+	EXTLDFLAGS = -extldflags "-static"
 endif
 
 ifeq ($(HAS_GO), GO)
@@ -69,10 +69,15 @@ endif
 TAGS ?=
 LDFLAGS ?= -X "gitea.com/gitea/act_runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
 
+.PHONY: all
 all: build
 
+.PHONY: help
+help: Makefile ## print Makefile help information.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m[TARGETS] default target: build\033[0m\n\n\033[35mTargets:\033[0m\n"} /^[0-9A-Za-z._-]+:.*?##/ { printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2 }' Makefile
+
 .PHONY: fmt
-fmt:
+fmt: ## format the Go code
 	$(GO) run $(GOLANGCI_LINT_PACKAGE) fmt
 
 .PHONY: go-check
@@ -96,10 +101,14 @@ fmt-check: fmt
 
 .PHONY: deps-tools
 deps-tools: ## install tool dependencies
-	$(GO) install $(GOVULNCHECK_PACKAGE)
+	$(GO) install $(GOLANGCI_LINT_PACKAGE) & \
+	$(GO) install $(GXZ_PACKAGE) & \
+	$(GO) install $(XGO_PACKAGE) & \
+	$(GO) install $(GOVULNCHECK_PACKAGE) & \
+	wait
 
 .PHONY: lint
-lint: lint-go
+lint: lint-go ## lint everything
 
 .PHONY: lint-go
 lint-go: ## lint go files
@@ -114,58 +123,59 @@ security-check: deps-tools
 	GOEXPERIMENT= $(GO) run $(GOVULNCHECK_PACKAGE) -show color ./... || true
 
 .PHONY: tidy
-tidy:
+tidy: ## run go mod tidy
 	$(GO) mod tidy
 
 .PHONY: tidy-check
 tidy-check: tidy
-	@diff=$$(git diff -- go.mod go.sum); \
+	@diff=$$(git diff --color=always -- go.mod go.sum); \
 	if [ -n "$$diff" ]; then \
 		echo "Please run 'make tidy' and commit the result:"; \
-		echo "$${diff}"; \
+		printf "%s" "$${diff}"; \
 		exit 1; \
 	fi
 
-test: fmt-check security-check
+.PHONY: test
+test: fmt-check security-check ## test everything
 	@$(GO) test -race -short -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
-install: $(GOFILES)
-	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'
+.PHONY: install
+install: $(GOFILES) ## install the act_runner binary via `go install`
+	$(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)'
 
-build: go-check $(EXECUTABLE)
+.PHONY: build
+build: go-check $(EXECUTABLE) ## build the act_runner binary
 
 $(EXECUTABLE): $(GOFILES)
-	$(GO) build -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)' -o $@
+	$(GO) build -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)' -o $@
 
 .PHONY: deps-backend
-deps-backend:
+deps-backend: ## install backend dependencies
 	$(GO) mod download
-	$(GO) install $(GXZ_PAGAGE)
-	$(GO) install $(XGO_PACKAGE)
 
 .PHONY: release
-release: release-windows release-linux release-darwin release-copy release-compress release-check
+release: release-windows release-linux release-darwin release-copy release-compress release-check ## build release artifacts
 
 $(DIST_DIRS):
 	mkdir -p $(DIST_DIRS)
 
 .PHONY: release-windows
 release-windows: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -buildmode exe -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(WINDOWS_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -buildmode exe -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-s -w -linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(WINDOWS_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
 ifeq ($(CI),true)
 	cp -r /build/* $(DIST)/binaries/
 endif
 
 .PHONY: release-linux
 release-linux: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(LINUX_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-s -w -linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(LINUX_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
 ifeq ($(CI),true)
 	cp -r /build/* $(DIST)/binaries/
 endif
 
 .PHONY: release-darwin
 release-darwin: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets '$(DARWIN_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
+	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-s -w $(LDFLAGS)' -targets '$(DARWIN_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
 ifeq ($(CI),true)
 	cp -r /build/* $(DIST)/binaries/
 endif
@@ -180,18 +190,20 @@ release-check: | $(DIST_DIRS)
 
 .PHONY: release-compress
 release-compress: | $(DIST_DIRS)
-	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && $(GO) run $(GXZ_PAGAGE) -k -9 $${file}; done;
+	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && $(GO) run $(GXZ_PACKAGE) -k -9 $${file}; done;
 
 .PHONY: docker
-docker:
+docker: ## build the docker image
 	if ! docker buildx version >/dev/null 2>&1; then \
 		ARG_DISABLE_CONTENT_TRUST=--disable-content-trust=false; \
 	fi; \
 	docker build $${ARG_DISABLE_CONTENT_TRUST} -t $(DOCKER_REF) .
 
-clean:
+.PHONY: clean
+clean: ## delete binary and coverage files
 	$(GO) clean -x -i ./...
 	rm -rf coverage.txt $(EXECUTABLE) $(DIST)
 
-version:
+.PHONY: version
+version: ## print the version
 	@echo $(VERSION)
