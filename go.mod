@@ -16,7 +16,7 @@ require (
 	golang.org/x/term v0.40.0
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.2
 )
 
@@ -26,8 +26,8 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v25.0.3+incompatible
 	github.com/docker/go-connections v0.6.0
-	github.com/go-git/go-billy/v5 v5.7.0
-	github.com/go-git/go-git/v5 v5.16.5
+	github.com/go-git/go-billy/v5 v5.8.0
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/gobwas/glob v0.2.3
 	github.com/imdario/mergo v0.3.16
 	github.com/julienschmidt/httprouter v1.3.0
