@@ -597,3 +597,45 @@ func TestReporter_StateNotifyFlush(t *testing.T) {
 	}, 500*time.Millisecond, 10*time.Millisecond,
 		"step transition should have triggered immediate state flush via stateNotify")
 }
+
+// TestReporter_StateHeartbeat verifies that ReportState sends a heartbeat
+// UpdateTask once stateReportInterval has elapsed since the last successful
+// report, even when nothing has changed. Without this, long-running silent
+// jobs (no log output, no step transitions) cause the server to time the
+// task out and cancel it (#826).
+func TestReporter_StateHeartbeat(t *testing.T) {
+	var updateTaskCalls atomic.Int64
+
+	client := mocks.NewClient(t)
+	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+			updateTaskCalls.Add(1)
+			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+		},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	taskCtx, err := structpb.NewStruct(map[string]any{})
+	require.NoError(t, err)
+	cfg, _ := config.LoadDefault("")
+	cfg.Runner.StateReportInterval = 50 * time.Millisecond
+	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter.ResetSteps(1)
+
+	// First call has no prior report — sends to seed lastReportedAt.
+	reporter.stateMu.Lock()
+	reporter.stateChanged = true
+	reporter.stateMu.Unlock()
+	require.NoError(t, reporter.ReportState(false))
+	require.Equal(t, int64(1), updateTaskCalls.Load())
+
+	// Second call immediately after with nothing changed — must skip.
+	require.NoError(t, reporter.ReportState(false))
+	assert.Equal(t, int64(1), updateTaskCalls.Load(), "no-op ReportState within stateReportInterval must skip")
+
+	// After stateReportInterval elapses, a heartbeat must fire even with no changes.
+	time.Sleep(2 * cfg.Runner.StateReportInterval)
+	require.NoError(t, reporter.ReportState(false))
+	assert.Equal(t, int64(2), updateTaskCalls.Load(), "ReportState must heartbeat after stateReportInterval even with no state change")
+}

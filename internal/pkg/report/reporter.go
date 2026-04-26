@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gitea.com/gitea/act_runner/internal/pkg/client"
@@ -47,6 +48,10 @@ type Reporter struct {
 	stateMu      sync.RWMutex
 	outputs      sync.Map
 	daemon       chan struct{}
+
+	// Unix-nanos of the last successful UpdateTask. Atomic so the heartbeat
+	// guard in ReportState reads it without contending stateMu.
+	lastReportedAtNanos atomic.Int64
 
 	// Adaptive batching control
 	logReportInterval   time.Duration
@@ -489,8 +494,12 @@ func (r *Reporter) ReportState(reportResult bool) error {
 
 	// Consume stateChanged atomically with the snapshot; restored on error
 	// below so a concurrent Fire() during UpdateTask isn't silently lost.
+	// Heartbeat at stateReportInterval even when nothing changed, so the server
+	// doesn't time out long-running silent jobs as orphaned (#826).
+	last := r.lastReportedAtNanos.Load()
+	withinHeartbeatInterval := last != 0 && time.Since(time.Unix(0, last)) < r.stateReportInterval
 	r.stateMu.Lock()
-	if !reportResult && !r.stateChanged && len(outputs) == 0 {
+	if !reportResult && !r.stateChanged && len(outputs) == 0 && withinHeartbeatInterval {
 		r.stateMu.Unlock()
 		return nil
 	}
@@ -517,6 +526,7 @@ func (r *Reporter) ReportState(reportResult bool) error {
 		return err
 	}
 	metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
+	r.lastReportedAtNanos.Store(time.Now().UnixNano())
 
 	for _, k := range resp.Msg.SentOutputs {
 		r.outputs.Store(k, struct{}{})
