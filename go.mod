@@ -114,7 +114,3 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-// Remove after github.com/docker/distribution is updated to support distribution/reference v0.6.0
-// (pulled in via moby/buildkit, breaks on undefined: reference.SplitHostname)
-replace github.com/distribution/reference v0.6.0 => github.com/distribution/reference v0.5.0
