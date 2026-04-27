@@ -44,6 +44,10 @@ func (sal *stepActionLocal) main() common.Executor {
 			return nil
 		}
 
+		printRunActionHeader(ctx, sal.Step, sal.env, sal.getRunContext())
+		rawLogger := common.Logger(ctx).WithField(rawOutputField, true)
+		defer rawLogger.Infof("::endgroup::")
+
 		actionDir := filepath.Join(sal.getRunContext().Config.Workdir, sal.Step.Uses)
 
 		localReader := func(ctx context.Context) actionYamlReader {

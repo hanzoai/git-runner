@@ -166,6 +166,10 @@ func (sar *stepActionRemote) main() common.Executor {
 	return common.NewPipelineExecutor(
 		sar.prepareActionExecutor(),
 		runStepExecutor(sar, stepStageMain, func(ctx context.Context) error {
+			printRunActionHeader(ctx, sar.Step, sar.env, sar.RunContext)
+			rawLogger := common.Logger(ctx).WithField(rawOutputField, true)
+			defer rawLogger.Infof("::endgroup::")
+
 			github := sar.getGithubContext(ctx)
 			if sar.remoteAction.IsCheckout() && isLocalCheckout(github, sar.Step) && !sar.RunContext.Config.NoSkipCheckout {
 				if sar.RunContext.Config.BindWorkdir {

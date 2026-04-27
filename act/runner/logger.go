@@ -30,6 +30,11 @@ const (
 	gray    = 37
 )
 
+const (
+	rawOutputField      = "raw_output"
+	scriptLineCyanField = "script_line_cyan"
+)
+
 var (
 	colors    []int
 	nextColor int
@@ -161,6 +166,8 @@ func withStepLogger(ctx context.Context, stepNumber int, stepID, stepName, stage
 
 type entryProcessor func(entry *logrus.Entry) *logrus.Entry
 
+// valueMasker applies secrets and ::add-mask:: patterns to every log entry, including
+// raw_output (command/stream) lines; there is no bypass by field.
 func valueMasker(insecureSecrets bool, secrets map[string]string) entryProcessor {
 	return func(entry *logrus.Entry) *logrus.Entry {
 		if insecureSecrets {
@@ -227,8 +234,12 @@ func (f *jobLogFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry) {
 		debugFlag = "[DEBUG] "
 	}
 
-	if entry.Data["raw_output"] == true {
-		fmt.Fprintf(b, "\x1b[%dm|\x1b[0m %s", f.color, entry.Message)
+	if entry.Data[rawOutputField] == true {
+		if entry.Data[scriptLineCyanField] == true {
+			fmt.Fprintf(b, "\x1b[%dm|\x1b[0m \x1b[36;1m%s\x1b[0m", f.color, entry.Message)
+		} else {
+			fmt.Fprintf(b, "\x1b[%dm|\x1b[0m %s", f.color, entry.Message)
+		}
 	} else if entry.Data["dryrun"] == true {
 		fmt.Fprintf(b, "\x1b[1m\x1b[%dm\x1b[7m*DRYRUN*\x1b[0m \x1b[%dm[%s] \x1b[0m%s%s", gray, f.color, job, debugFlag, entry.Message)
 	} else {
@@ -251,7 +262,7 @@ func (f *jobLogFormatter) print(b *bytes.Buffer, entry *logrus.Entry) {
 		debugFlag = "[DEBUG] "
 	}
 
-	if entry.Data["raw_output"] == true {
+	if entry.Data[rawOutputField] == true {
 		fmt.Fprintf(b, "[%s]   | %s", job, entry.Message)
 	} else if entry.Data["dryrun"] == true {
 		fmt.Fprintf(b, "*DRYRUN* [%s] %s%s", job, debugFlag, entry.Message)
