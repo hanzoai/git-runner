@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -47,10 +48,15 @@ func runCacheServer(configFile *string, cacheArgs *cacheServerArgs) func(cmd *co
 			port = cacheArgs.Port
 		}
 
+		secret := cfg.Cache.ExternalSecret
+		if secret == "" {
+			return errors.New("cache.external_secret must be set for cache-server; configure the same value on each runner that points at this server via cache.external_server")
+		}
 		cacheHandler, err := artifactcache.StartHandler(
 			dir,
 			host,
 			port,
+			secret,
 			log.StandardLogger().WithField("module", "cache_request"),
 		)
 		if err != nil {

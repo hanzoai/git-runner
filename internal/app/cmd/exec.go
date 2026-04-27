@@ -6,6 +6,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -368,7 +370,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		}
 
 		// init a cache server
-		handler, err := artifactcache.StartHandler("", "", 0, log.StandardLogger().WithField("module", "cache_request"))
+		handler, err := artifactcache.StartHandler("", "", 0, "", log.StandardLogger().WithField("module", "cache_request"))
 		if err != nil {
 			return err
 		}
@@ -393,6 +395,25 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			execArgs.artifactServerPath = tempDir
 		}
 
+		// Register ACTIONS_RUNTIME_TOKEN against local cache server
+		env := execArgs.LoadEnvs()
+		const actionsRuntimeTokenEnvName = "ACTIONS_RUNTIME_TOKEN"
+		actionsRuntimeToken := env[actionsRuntimeTokenEnvName]
+		if actionsRuntimeToken == "" {
+			actionsRuntimeToken = os.Getenv(actionsRuntimeTokenEnvName)
+		}
+		if actionsRuntimeToken == "" {
+			tmpBranch := make([]byte, 12)
+			if _, err := rand.Read(tmpBranch); err != nil {
+				actionsRuntimeToken = "token"
+			} else {
+				actionsRuntimeToken = hex.EncodeToString(tmpBranch)
+			}
+			env[actionsRuntimeTokenEnvName] = actionsRuntimeToken
+			os.Setenv(actionsRuntimeTokenEnvName, actionsRuntimeToken)
+		}
+		handler.RegisterJob(actionsRuntimeToken, "__local/__exec")
+
 		// run the plan
 		config := &runner.Config{
 			Workdir:               execArgs.Workdir(),
@@ -402,7 +423,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 			ForceRebuild:          execArgs.forceRebuild,
 			LogOutput:             true,
 			JSONLogger:            execArgs.jsonLogger,
-			Env:                   execArgs.LoadEnvs(),
+			Env:                   env,
 			Vars:                  execArgs.LoadVars(),
 			Secrets:               execArgs.LoadSecrets(),
 			InsecureSecrets:       execArgs.insecureSecrets,

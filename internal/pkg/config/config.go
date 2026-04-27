@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -47,6 +48,7 @@ type Cache struct {
 	Host           string `yaml:"host"`            // Host specifies the caching host.
 	Port           uint16 `yaml:"port"`            // Port specifies the caching port.
 	ExternalServer string `yaml:"external_server"` // ExternalServer specifies the URL of external cache server
+	ExternalSecret string `yaml:"external_secret"` // ExternalSecret is a shared secret between this runner and an external act_runner cache-server, enabling per-job ACTIONS_RUNTIME_TOKEN authentication and repo scoping over the network. Leave empty to keep the legacy unauthenticated behavior.
 }
 
 // Container represents the configuration for the container.
@@ -134,6 +136,9 @@ func LoadDefault(file string) (*Config, error) {
 		if cfg.Cache.Dir == "" {
 			home, _ := os.UserHomeDir()
 			cfg.Cache.Dir = filepath.Join(home, ".cache", "actcache")
+		}
+		if cfg.Cache.ExternalServer != "" && cfg.Cache.ExternalSecret == "" {
+			return nil, errors.New("cache.external_server is set but cache.external_secret is empty; configure the same external_secret on this runner and the act_runner cache-server")
 		}
 	}
 	if cfg.Container.WorkdirParent == "" {
