@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	code.gitea.io/actions-proto-go v0.4.1
-	connectrpc.com/connect v1.19.1
+	connectrpc.com/connect v1.19.2
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/docker/docker v25.0.13+incompatible
 	github.com/joho/godotenv v1.5.1
