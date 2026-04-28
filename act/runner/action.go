@@ -429,7 +429,7 @@ func newStepContainer(ctx context.Context, step step, image string, cmd, entrypo
 		Image:        image,
 		Username:     rc.Config.Secrets["DOCKER_USERNAME"],
 		Password:     rc.Config.Secrets["DOCKER_PASSWORD"],
-		Name:         createSimpleContainerName(rc.jobContainerName(), "STEP-"+stepModel.ID),
+		Name:         createContainerName(rc.jobContainerName(), "STEP-"+stepModel.ID),
 		Env:          envList,
 		Mounts:       mounts,
 		NetworkMode:  networkMode,

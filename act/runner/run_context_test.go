@@ -622,23 +622,16 @@ func TestRunContextGetEnv(t *testing.T) {
 	}
 }
 
-func Test_createSimpleContainerName(t *testing.T) {
-	tests := []struct {
-		parts []string
-		want  string
-	}{
-		{
-			parts: []string{"a--a", "BB正", "c-C"},
-			want:  "a-a_BB_c-C",
-		},
-		{
-			parts: []string{"a-a", "", "-"},
-			want:  "a-a",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(strings.Join(tt.parts, " "), func(t *testing.T) {
-			assert.Equalf(t, tt.want, createSimpleContainerName(tt.parts...), "createSimpleContainerName(%v)", tt.parts)
-		})
-	}
+func TestCreateContainerNameBoundedForLongMatrixInput(t *testing.T) {
+	longMatrixValue := strings.Repeat("os=ubuntu-latest-go=1.24-node=22-", 20)
+	name := createContainerName(
+		"gitea",
+		"WORKFLOW-super-long-workflow-name",
+		"JOB-build-matrix-"+longMatrixValue,
+	)
+
+	assert.LessOrEqual(t, len(name), 128)
+	assert.LessOrEqual(t, len(name+"-env"), 255)
+	assert.LessOrEqual(t, len(name+"-network"), 255)
+	assert.LessOrEqual(t, len(name+"-job1234567890"), 255)
 }
