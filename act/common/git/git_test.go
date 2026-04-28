@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -302,4 +304,62 @@ func gitCmd(args ...string) error {
 		return exitError
 	}
 	return nil
+}
+
+func TestAcquireCloneLock(t *testing.T) {
+	t.Run("same directory serializes", func(t *testing.T) {
+		dir := t.TempDir()
+
+		unlock1 := acquireCloneLock(dir)
+
+		secondAcquired := make(chan struct{})
+		go func() {
+			unlock := acquireCloneLock(dir)
+			close(secondAcquired)
+			unlock()
+		}()
+
+		select {
+		case <-secondAcquired:
+			t.Fatal("second acquire should block while first holds the lock")
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		unlock1()
+
+		select {
+		case <-secondAcquired:
+		case <-time.After(time.Second):
+			t.Fatal("second acquire should proceed after first releases the lock")
+		}
+	})
+
+	t.Run("different directories do not block", func(t *testing.T) {
+		dirA := t.TempDir()
+		dirB := t.TempDir()
+
+		unlockA := acquireCloneLock(dirA)
+		defer unlockA()
+
+		done := make(chan struct{})
+		go func() {
+			unlock := acquireCloneLock(dirB)
+			unlock()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("acquire on a different directory must not block")
+		}
+	})
+
+	t.Run("same directory reuses the same mutex", func(t *testing.T) {
+		dir := t.TempDir()
+
+		v1, _ := cloneLocks.LoadOrStore(dir, &sync.Mutex{})
+		v2, _ := cloneLocks.LoadOrStore(dir, &sync.Mutex{})
+		require.Same(t, v1, v2)
+	})
 }
