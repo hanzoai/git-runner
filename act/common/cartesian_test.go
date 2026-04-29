@@ -35,9 +35,9 @@ func TestCartesianProduct(t *testing.T) {
 		"baz": {false, true},
 	}
 	output = CartesianProduct(input)
-	assert.Len(output, 0) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(output)
 
 	input = map[string][]any{}
 	output = CartesianProduct(input)
-	assert.Len(output, 0) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(output)
 }

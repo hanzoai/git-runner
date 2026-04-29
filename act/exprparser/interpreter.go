@@ -156,7 +156,6 @@ func (impl *interperterImpl) evaluateNode(exprNode actionlint.ExprNode) (any, er
 	}
 }
 
-//nolint:gocyclo // function handles many cases
 func (impl *interperterImpl) evaluateVariable(variableNode *actionlint.VariableNode) (any, error) {
 	switch strings.ToLower(variableNode.Name) {
 	case "github":
@@ -584,7 +583,6 @@ func (impl *interperterImpl) evaluateLogicalCompare(compareNode *actionlint.Logi
 	return nil, fmt.Errorf("Unable to compare incompatibles types '%s' and '%s'", leftValue.Kind(), rightValue.Kind())
 }
 
-//nolint:gocyclo // function handles many cases
 func (impl *interperterImpl) evaluateFuncCall(funcCallNode *actionlint.FuncCallNode) (any, error) {
 	args := make([]reflect.Value, 0)
 

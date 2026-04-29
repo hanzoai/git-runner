@@ -194,7 +194,6 @@ func TestParseRunWithInvalidArgs(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // function handles many cases
 func TestParseWithVolumes(t *testing.T) {
 	// A single volume
 	arr, tryit := setupPlatformVolume([]string{`/tmp`}, []string{`c:\tmp`})
@@ -632,7 +631,7 @@ func TestParseModes(t *testing.T) {
 	}
 
 	// uts ko
-	_, _, _, err = parseRun([]string{"--uts=container:", "img", "cmd"}) //nolint:dogsled // ignoring multiple returns in test helpers
+	_, _, _, err = parseRun([]string{"--uts=container:", "img", "cmd"})
 	assert.ErrorContains(t, err, "--uts: invalid UTS mode")
 
 	// uts ok
@@ -693,7 +692,7 @@ func TestParseRestartPolicy(t *testing.T) {
 
 func TestParseRestartPolicyAutoRemove(t *testing.T) {
 	expected := "Conflicting options: --restart and --rm"
-	_, _, _, err := parseRun([]string{"--rm", "--restart=always", "img", "cmd"}) //nolint:dogsled // ignoring multiple returns in test helpers
+	_, _, _, err := parseRun([]string{"--rm", "--restart=always", "img", "cmd"})
 	if err == nil || err.Error() != expected {
 		t.Fatalf("Expected error %v, but got none", expected)
 	}

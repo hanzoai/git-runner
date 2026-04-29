@@ -97,10 +97,10 @@ func TestStepActionLocalTest(t *testing.T) {
 	})
 
 	err := sal.pre()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	err = sal.main()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	cm.AssertExpectations(t)
 	salm.AssertExpectations(t)

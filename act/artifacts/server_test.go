@@ -202,7 +202,7 @@ func TestListArtifactContainer(t *testing.T) {
 		panic(err)
 	}
 
-	assert.Equal(1, len(response.Value)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Len(response.Value, 1)
 	assert.Equal("some/file", response.Value[0].Path)
 	assert.Equal("file", response.Value[0].ItemType)
 	assert.Equal("http://localhost/artifact/1/some/file/.", response.Value[0].ContentLocation)
@@ -283,7 +283,7 @@ func runTestJobFile(ctx context.Context, t *testing.T, tjfi TestJobFileInfo) {
 		}
 
 		workdir, err := filepath.Abs(tjfi.workdir)
-		assert.Nil(t, err, workdir) //nolint:testifylint // pre-existing issue from nektos/act
+		assert.NoError(t, err, workdir) //nolint:testifylint // pre-existing issue from nektos/act
 		fullWorkflowPath := filepath.Join(workdir, tjfi.workflowPath)
 		runnerConfig := &runner.Config{
 			Workdir:               workdir,
@@ -299,16 +299,16 @@ func runTestJobFile(ctx context.Context, t *testing.T, tjfi TestJobFileInfo) {
 		}
 
 		runner, err := runner.New(runnerConfig)
-		assert.Nil(t, err, tjfi.workflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+		assert.NoError(t, err, tjfi.workflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 
 		planner, err := model.NewWorkflowPlanner(fullWorkflowPath, true)
-		assert.Nil(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+		assert.NoError(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 
 		plan, err := planner.PlanEvent(tjfi.eventName)
 		if err == nil {
 			err = runner.NewPlanExecutor(plan)(ctx)
 			if tjfi.errorMessage == "" {
-				assert.Nil(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+				assert.NoError(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 			} else {
 				assert.Error(t, err, tjfi.errorMessage) //nolint:testifylint // pre-existing issue from nektos/act
 			}

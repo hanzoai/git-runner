@@ -87,7 +87,7 @@ func TestGraphMissingEvent(t *testing.T) {
 	plan, err := planner.PlanEvent("push")
 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.NotNil(t, plan)
-	assert.Equal(t, 0, len(plan.Stages)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, plan.Stages)
 
 	assert.Contains(t, buf.String(), "no events found for workflow: no-event.yml")
 	log.SetOutput(out)
@@ -100,7 +100,7 @@ func TestGraphMissingFirst(t *testing.T) {
 	plan, err := planner.PlanEvent("push")
 	assert.EqualError(t, err, "unable to build dependency graph for no first (no-first.yml)") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.NotNil(t, plan)
-	assert.Equal(t, 0, len(plan.Stages)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, plan.Stages)
 }
 
 func TestGraphWithMissing(t *testing.T) {
@@ -114,7 +114,7 @@ func TestGraphWithMissing(t *testing.T) {
 
 	plan, err := planner.PlanEvent("push")
 	assert.NotNil(t, plan)
-	assert.Equal(t, 0, len(plan.Stages))                                                    //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, plan.Stages)
 	assert.EqualError(t, err, "unable to build dependency graph for missing (missing.yml)") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Contains(t, buf.String(), "unable to build dependency graph for missing (missing.yml)")
 	log.SetOutput(out)
@@ -134,7 +134,7 @@ func TestGraphWithSomeMissing(t *testing.T) {
 	plan, err := planner.PlanAll()
 	assert.Error(t, err, "unable to build dependency graph for no first (no-first.yml)") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.NotNil(t, plan)
-	assert.Equal(t, 1, len(plan.Stages)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Len(t, plan.Stages, 1)
 	assert.Contains(t, buf.String(), "unable to build dependency graph for missing (missing.yml)")
 	assert.Contains(t, buf.String(), "unable to build dependency graph for no first (no-first.yml)")
 	log.SetOutput(out)
@@ -159,7 +159,7 @@ func TestGraphEvent(t *testing.T) {
 	plan, err = planner.PlanEvent("release")
 	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.NotNil(t, plan)
-	assert.Equal(t, 0, len(plan.Stages)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, plan.Stages)
 }
 
 type TestJobFileInfo struct {
@@ -177,7 +177,7 @@ func (j *TestJobFileInfo) runTest(ctx context.Context, t *testing.T, cfg *Config
 	log.SetLevel(logLevel)
 
 	workdir, err := filepath.Abs(j.workdir)
-	assert.Nil(t, err, workdir) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err, workdir) //nolint:testifylint // pre-existing issue from nektos/act
 
 	fullWorkflowPath := filepath.Join(workdir, j.workflowPath)
 	runnerConfig := &Config{
@@ -197,17 +197,17 @@ func (j *TestJobFileInfo) runTest(ctx context.Context, t *testing.T, cfg *Config
 	}
 
 	runner, err := New(runnerConfig)
-	assert.Nil(t, err, j.workflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err, j.workflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 
 	planner, err := model.NewWorkflowPlanner(fullWorkflowPath, true)
-	assert.Nil(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 
 	plan, err := planner.PlanEvent(j.eventName)
 	assert.True(t, (err == nil) != (plan == nil), "PlanEvent should return either a plan or an error") //nolint:testifylint // pre-existing issue from nektos/act
 	if err == nil && plan != nil {
 		err = runner.NewPlanExecutor(plan)(ctx)
 		if j.errorMessage == "" {
-			assert.Nil(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err, fullWorkflowPath) //nolint:testifylint // pre-existing issue from nektos/act
 		} else {
 			assert.Error(t, err, j.errorMessage) //nolint:testifylint // pre-existing issue from nektos/act
 		}

@@ -29,17 +29,17 @@ func TestImageExistsLocally(t *testing.T) {
 
 	// Test if image exists with specific tag
 	invalidImageTag, err := ImageExistsLocally(ctx, "library/alpine:this-random-tag-will-never-exist", "linux/amd64")
-	assert.Nil(t, err)                      //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, false, invalidImageTag) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.False(t, invalidImageTag)
 
 	// Test if image exists with specific architecture (image platform)
 	invalidImagePlatform, err := ImageExistsLocally(ctx, "alpine:latest", "windows/amd64")
-	assert.Nil(t, err)                           //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, false, invalidImagePlatform) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.False(t, invalidImagePlatform)
 
 	// pull an image
 	cli, err := client.NewClientWithOpts(client.FromEnv)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	cli.NegotiateAPIVersion(context.Background())
 
 	// Chose alpine latest because it's so small
@@ -47,25 +47,25 @@ func TestImageExistsLocally(t *testing.T) {
 	readerDefault, err := cli.ImagePull(ctx, "node:16-buster-slim", types.ImagePullOptions{
 		Platform: "linux/amd64",
 	})
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	defer readerDefault.Close()
 	_, err = io.ReadAll(readerDefault)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	imageDefaultArchExists, err := ImageExistsLocally(ctx, "node:16-buster-slim", "linux/amd64")
-	assert.Nil(t, err)                            //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, true, imageDefaultArchExists) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.True(t, imageDefaultArchExists)
 
 	// Validate if another architecture platform can be pulled
 	readerArm64, err := cli.ImagePull(ctx, "node:16-buster-slim", types.ImagePullOptions{
 		Platform: "linux/arm64",
 	})
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	defer readerArm64.Close()
 	_, err = io.ReadAll(readerArm64)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	imageArm64Exists, err := ImageExistsLocally(ctx, "node:16-buster-slim", "linux/arm64")
-	assert.Nil(t, err)                      //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, true, imageArm64Exists) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.True(t, imageArm64Exists)
 }

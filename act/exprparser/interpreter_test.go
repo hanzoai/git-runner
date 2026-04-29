@@ -35,7 +35,7 @@ func TestLiterals(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -105,10 +105,10 @@ func TestOperators(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
 			if tt.error != "" {
-				assert.NotNil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+				assert.Error(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 				assert.Equal(t, tt.error, err.Error())
 			} else {
-				assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+				assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			}
 
 			assert.Equal(t, tt.expected, output)
@@ -157,7 +157,7 @@ func TestOperatorsCompare(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -520,7 +520,7 @@ func TestOperatorsBooleanEvaluation(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			if expected, ok := tt.expected.(float64); ok && math.IsNaN(expected) {
 				assert.True(t, math.IsNaN(output.(float64)))
@@ -624,7 +624,7 @@ func TestContexts(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})

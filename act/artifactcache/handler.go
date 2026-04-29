@@ -739,7 +739,6 @@ const (
 	keepOld    = 5 * time.Minute
 )
 
-//nolint:gocyclo // function handles many cases
 func (h *Handler) gcCache() {
 	if h.gcing.Load() {
 		return

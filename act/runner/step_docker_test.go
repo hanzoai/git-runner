@@ -102,7 +102,7 @@ func TestStepDockerMain(t *testing.T) {
 	cm.On("GetContainerArchive", ctx, "/var/run/act/workflow/pathcmd.txt").Return(io.NopCloser(&bytes.Buffer{}), nil)
 
 	err := sd.main()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	assert.Equal(t, "node:14", input.Image)
 
@@ -114,10 +114,10 @@ func TestStepDockerPrePost(t *testing.T) {
 	sd := &stepDocker{}
 
 	err := sd.pre()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	err = sd.post()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err)
 }
 
 func TestStepDockerNewStepContainerNetworkMode(t *testing.T) {

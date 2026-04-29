@@ -39,7 +39,6 @@ type stepActionRemote struct {
 
 var stepActionRemoteNewCloneExecutor = git.NewGitCloneExecutor
 
-//nolint:gocyclo // function handles many cases
 func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 	return func(ctx context.Context) error {
 		if sar.remoteAction != nil && sar.action != nil {

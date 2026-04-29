@@ -137,7 +137,7 @@ runs:
 
 			action, err := readActionImpl(context.Background(), tt.step, "actionDir", "actionPath", readFile, writeFile)
 
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			assert.Equal(t, tt.expected, action)
 
 			closerMock.AssertExpectations(t)
@@ -247,7 +247,7 @@ func TestActionRunner(t *testing.T) {
 
 			err := runActionImpl(tt.step, "dir", newRemoteAction("org/repo/path@ref"))(ctx)
 
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			cm.AssertExpectations(t)
 		})
 	}

@@ -29,7 +29,7 @@ func TestGetSocketAndHostWithSocket(t *testing.T) {
 	ret, err := GetSocketAndHost(socketURI)
 
 	// Assert
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{socketURI, dockerHost}, ret)
 }
 
@@ -42,7 +42,7 @@ func TestGetSocketAndHostNoSocket(t *testing.T) {
 	ret, err := GetSocketAndHost("")
 
 	// Assert
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{dockerHost, dockerHost}, ret)
 }
 
@@ -57,8 +57,8 @@ func TestGetSocketAndHostOnlySocket(t *testing.T) {
 	ret, err := GetSocketAndHost(socketURI)
 
 	// Assert
-	assert.NoError(t, err, "Expected no error from GetSocketAndHost")            //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, true, defaultSocketFound, "Expected to find default socket") //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err, "Expected no error from GetSocketAndHost") //nolint:testifylint // pre-existing issue from nektos/act
+	assert.True(t, defaultSocketFound, "Expected to find default socket")
 	assert.Equal(t, socketURI, ret.Socket, "Expected socket to match common location")
 	assert.Equal(t, defaultSocket, ret.Host, "Expected ret.Host to match default socket location")
 }
@@ -73,7 +73,7 @@ func TestGetSocketAndHostDontMount(t *testing.T) {
 	ret, err := GetSocketAndHost("-")
 
 	// Assert
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{"-", dockerHost}, ret)
 }
 
@@ -87,8 +87,8 @@ func TestGetSocketAndHostNoHostNoSocket(t *testing.T) {
 	ret, err := GetSocketAndHost("")
 
 	// Assert
-	assert.Equal(t, true, found, "Expected a default socket to be found") //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Nil(t, err, "Expected no error from GetSocketAndHost")         //nolint:testifylint // pre-existing issue from nektos/act
+	assert.True(t, found, "Expected a default socket to be found")
+	assert.NoError(t, err, "Expected no error from GetSocketAndHost") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{defaultSocket, defaultSocket}, ret, "Expected to match default socket location")
 }
 
@@ -112,8 +112,8 @@ func TestGetSocketAndHostNoHostNoSocketDefaultLocation(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, unixSocket, defaultSocket, "Expected default socket to match common socket location")
-	assert.Equal(t, true, found, "Expected default socket to be found") //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Nil(t, err, "Expected no error from GetSocketAndHost")       //nolint:testifylint // pre-existing issue from nektos/act
+	assert.True(t, found, "Expected default socket to be found")
+	assert.NoError(t, err, "Expected no error from GetSocketAndHost") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{unixSocket, unixSocket}, ret, "Expected to match default socket location")
 }
 
@@ -128,7 +128,7 @@ func TestGetSocketAndHostNoHostInvalidSocket(t *testing.T) {
 	ret, err := GetSocketAndHost(mySocket)
 
 	// Assert
-	assert.Equal(t, false, found, "Expected no default socket to be found")      //nolint:testifylint // pre-existing issue from nektos/act
+	assert.False(t, found, "Expected no default socket to be found")
 	assert.Equal(t, "", defaultSocket, "Expected no default socket to be found") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, SocketAndHost{}, ret, "Expected to match default socket location")
 	assert.Error(t, err, "Expected an error in invalid state")
@@ -147,8 +147,8 @@ func TestGetSocketAndHostOnlySocketValidButUnusualLocation(t *testing.T) {
 	// Assert
 	// Default socket locations
 	assert.Equal(t, "", defaultSocket, "Expect default socket location to be empty") //nolint:testifylint // pre-existing issue from nektos/act
-	assert.Equal(t, false, found, "Expected no default socket to be found")          //nolint:testifylint // pre-existing issue from nektos/act
+	assert.False(t, found, "Expected no default socket to be found")
 	// Sane default
-	assert.Nil(t, err, "Expect no error from GetSocketAndHost") //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err, "Expect no error from GetSocketAndHost") //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(t, socketURI, ret.Host, "Expect host to default to unusual socket")
 }

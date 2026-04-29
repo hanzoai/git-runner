@@ -60,7 +60,7 @@ func TestMaxParallelStrategy(t *testing.T) {
 			matrixes, err := job.GetMatrixes()
 			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			assert.NotNil(t, matrixes)
-			assert.Equal(t, 5, len(matrixes)) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.Len(t, matrixes, 5)
 			assert.Equal(t, tt.expectedMaxParallel, job.Strategy.MaxParallel)
 		})
 	}

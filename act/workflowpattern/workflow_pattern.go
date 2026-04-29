@@ -38,7 +38,6 @@ func CompilePattern(rawpattern string) (*WorkflowPattern, error) {
 	}, nil
 }
 
-//nolint:gocyclo // function handles many cases
 func PatternToRegex(pattern string) (string, error) {
 	var rpattern strings.Builder
 	rpattern.WriteString("^")

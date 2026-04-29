@@ -56,7 +56,7 @@ jobs:
 	assert.NoError(t, err, "read workflow should succeed") //nolint:testifylint // pre-existing issue from nektos/act
 
 	newSchedules = workflow.OnSchedule()
-	assert.Len(t, newSchedules, 0) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, newSchedules)
 
 	yaml = `
 name: local-action-docker-url
@@ -74,7 +74,7 @@ jobs:
 	assert.NoError(t, err, "read workflow should succeed") //nolint:testifylint // pre-existing issue from nektos/act
 
 	newSchedules = workflow.OnSchedule()
-	assert.Len(t, newSchedules, 0) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, newSchedules)
 
 	yaml = `
 name: local-action-docker-url
@@ -91,7 +91,7 @@ jobs:
 	assert.NoError(t, err, "read workflow should succeed") //nolint:testifylint // pre-existing issue from nektos/act
 
 	newSchedules = workflow.OnSchedule()
-	assert.Len(t, newSchedules, 0) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Empty(t, newSchedules)
 }
 
 func TestReadWorkflow_StringEvent(t *testing.T) {
@@ -870,7 +870,7 @@ jobs:
 					assert.Nil(t, matrix, "matrix should be nil for jobs without strategy")
 				} else {
 					assert.NotNil(t, matrix, "matrix should not be nil")
-					assert.Equal(t, tt.wantLen, len(matrix), "matrix should have expected number of keys") //nolint:testifylint // pre-existing issue from nektos/act
+					assert.Len(t, matrix, tt.wantLen, "matrix should have expected number of keys")
 					if tt.checkFn != nil {
 						tt.checkFn(t, matrix)
 					}

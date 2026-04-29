@@ -282,7 +282,7 @@ func TestGetGitHubContext(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cwd, err := os.Getwd()
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	rc := &RunContext{
 		Config: &Config{

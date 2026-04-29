@@ -137,8 +137,6 @@ func (runner *runnerImpl) configure() (Runner, error) {
 }
 
 // NewPlanExecutor ...
-//
-//nolint:gocyclo // function handles many cases
 func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 	maxJobNameLen := 0
 

@@ -128,7 +128,6 @@ func (*DefaultFs) Readlink(path string) (string, error) {
 	return os.Readlink(path)
 }
 
-//nolint:gocyclo // function handles many cases
 func (fc *FileCollector) CollectFiles(ctx context.Context, submodulePath []string) filepath.WalkFunc {
 	i, _ := fc.Fs.OpenGitIndex(path.Join(fc.SrcPath, path.Join(submodulePath...)))
 	return func(file string, fi os.FileInfo, err error) error {

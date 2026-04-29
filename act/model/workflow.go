@@ -440,8 +440,6 @@ func (j *Job) Matrix() map[string][]any {
 
 // GetMatrixes returns the matrix cross product
 // It skips includes and hard fails excludes for non-existing keys
-//
-//nolint:gocyclo // function handles many cases
 func (j *Job) GetMatrixes() ([]map[string]any, error) {
 	matrixes := make([]map[string]any, 0)
 	if j.Strategy != nil {

@@ -43,7 +43,7 @@ func TestFunctionContains(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -72,7 +72,7 @@ func TestFunctionStartsWith(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -101,7 +101,7 @@ func TestFunctionEndsWith(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -128,7 +128,7 @@ func TestFunctionJoin(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -154,7 +154,7 @@ func TestFunctionToJSON(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -177,7 +177,7 @@ func TestFunctionFromJSON(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := NewInterpeter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -205,9 +205,9 @@ func TestFunctionHashFiles(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			workdir, err := filepath.Abs("testdata")
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			output, err := NewInterpeter(env, Config{WorkingDir: workdir}).Evaluate(tt.input, DefaultStatusCheckNone)
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 			assert.Equal(t, tt.expected, output)
 		})
@@ -248,7 +248,7 @@ func TestFunctionFormat(t *testing.T) {
 			if tt.error != nil {
 				assert.Equal(t, tt.error, err.Error())
 			} else {
-				assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+				assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 				assert.Equal(t, tt.expected, output)
 			}
 		})

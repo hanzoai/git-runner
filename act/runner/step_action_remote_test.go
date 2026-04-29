@@ -272,8 +272,8 @@ func TestStepActionRemotePre(t *testing.T) {
 
 			err := sar.pre()(ctx)
 
-			assert.Nil(t, err)                  //nolint:testifylint // pre-existing issue from nektos/act
-			assert.Equal(t, true, clonedAction) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.True(t, clonedAction)
 
 			sarm.AssertExpectations(t)
 		})
@@ -343,8 +343,8 @@ func TestStepActionRemotePreThroughAction(t *testing.T) {
 
 			err := sar.pre()(ctx)
 
-			assert.Nil(t, err)                  //nolint:testifylint // pre-existing issue from nektos/act
-			assert.Equal(t, true, clonedAction) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.True(t, clonedAction)
 
 			sarm.AssertExpectations(t)
 		})
@@ -419,7 +419,7 @@ func TestStepActionRemotePreThroughActionToken(t *testing.T) {
 
 			err := sar.pre()(ctx)
 
-			assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+			assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 			// Verify that the clone was called (URL should be redirected to github.com)
 			assert.True(t, actualURL != "", "Expected clone to be called") //nolint:testifylint // pre-existing issue from nektos/act
 			assert.Equal(t, "https://github.com/org/repo", actualURL, "URL should be redirected to github.com")

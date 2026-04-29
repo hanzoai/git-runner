@@ -71,7 +71,10 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, handler.Close())
 			assert.Nil(t, handler.server)
 			assert.Nil(t, handler.listener)
-			_, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, 1), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, 1), "", nil)
+			if err == nil {
+				resp.Body.Close()
+			}
 			assert.Error(t, err)
 		})
 	}()
@@ -79,8 +82,9 @@ func TestHandler(t *testing.T) {
 	t.Run("get not exist", func(t *testing.T) {
 		key := strings.ToLower(t.Name())
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d20"
-		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 204, resp.StatusCode)
 	})
 
@@ -94,16 +98,18 @@ func TestHandler(t *testing.T) {
 	})
 
 	t.Run("clean", func(t *testing.T) {
-		resp, err := testClient.Post(base+"/clean", "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Post(base+"/clean", "", nil)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
 	})
 
 	t.Run("reserve with bad request", func(t *testing.T) {
 		body := []byte(`invalid json`)
 		require.NoError(t, err)
-		resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 400, resp.StatusCode)
 	})
 
@@ -120,8 +126,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&first))
@@ -134,8 +141,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&second))
@@ -151,8 +159,9 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Do(req)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 400, resp.StatusCode)
 	})
 
@@ -162,8 +171,9 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Do(req)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 400, resp.StatusCode)
 	})
 
@@ -181,8 +191,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			got := struct {
@@ -197,13 +208,15 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Do(req)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
@@ -212,8 +225,9 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Do(req)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 400, resp.StatusCode)
 		}
 	})
@@ -232,8 +246,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			got := struct {
@@ -248,24 +263,27 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes xx-99/*")
-			resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Do(req)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 400, resp.StatusCode)
 		}
 	})
 
 	t.Run("commit with bad id", func(t *testing.T) {
 		{
-			resp, err := testClient.Post(base+"/caches/invalid_id", "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches/invalid_id", "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 400, resp.StatusCode)
 		}
 	})
 
 	t.Run("commit with not exist id", func(t *testing.T) {
 		{
-			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, 100), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, 100), "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 400, resp.StatusCode)
 		}
 	})
@@ -284,8 +302,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			got := struct {
@@ -300,18 +319,21 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Do(req)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 400, resp.StatusCode)
 		}
 	})
@@ -330,8 +352,9 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 
 			got := struct {
@@ -346,32 +369,37 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-59/*")
-			resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Do(req)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, 500, resp.StatusCode)
 		}
 	})
 
 	t.Run("get with bad id", func(t *testing.T) {
-		resp, err := testClient.Get(base + "/artifacts/invalid_id") //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(base + "/artifacts/invalid_id")
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 400, resp.StatusCode)
 	})
 
 	t.Run("get with not exist id", func(t *testing.T) {
-		resp, err := testClient.Get(signArtifactURL(handler, 100)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(signArtifactURL(handler, 100))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 404, resp.StatusCode)
 	})
 
 	t.Run("get with not exist id", func(t *testing.T) {
-		resp, err := testClient.Get(signArtifactURL(handler, 100)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(signArtifactURL(handler, 100))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 404, resp.StatusCode)
 	})
 
@@ -401,8 +429,9 @@ func TestHandler(t *testing.T) {
 			key + "_a",
 		}, ",")
 
-		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 
 		/*
@@ -421,8 +450,9 @@ func TestHandler(t *testing.T) {
 		assert.Equal(t, "hit", got.Result)
 		assert.Equal(t, keys[except], got.CacheKey)
 
-		contentResp, err := testClient.Get(got.ArchiveLocation) //nolint:bodyclose // pre-existing issue from nektos/act
+		contentResp, err := testClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
+		defer contentResp.Body.Close()
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
 		require.NoError(t, err)
@@ -439,8 +469,9 @@ func TestHandler(t *testing.T) {
 
 		{
 			reqKey := key + "_aBc"
-			resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKey, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+			resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKey, version))
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			require.Equal(t, 200, resp.StatusCode)
 			got := struct {
 				Result          string `json:"result"`
@@ -478,8 +509,9 @@ func TestHandler(t *testing.T) {
 			key + "_a_b",
 		}, ",")
 
-		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 
 		/*
@@ -496,8 +528,9 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 		assert.Equal(t, keys[expect], got.CacheKey)
 
-		contentResp, err := testClient.Get(got.ArchiveLocation) //nolint:bodyclose // pre-existing issue from nektos/act
+		contentResp, err := testClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
+		defer contentResp.Body.Close()
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
 		require.NoError(t, err)
@@ -530,8 +563,9 @@ func TestHandler(t *testing.T) {
 			key + "_a_b",
 		}, ",")
 
-		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 
 		/*
@@ -549,8 +583,9 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 		assert.Equal(t, keys[expect], got.CacheKey)
 
-		contentResp, err := testClient.Get(got.ArchiveLocation) //nolint:bodyclose // pre-existing issue from nektos/act
+		contentResp, err := testClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
+		defer contentResp.Body.Close()
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
 		require.NoError(t, err)
@@ -567,8 +602,9 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 			Size:    int64(len(content)),
 		})
 		require.NoError(t, err)
-		resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Post(base+"/caches", "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
 
 		got := struct {
@@ -583,19 +619,22 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := testClient.Do(req) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Do(req)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
 	}
 	{
-		resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
 	}
 	var archiveLocation string
 	{
-		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version)) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 		got := struct {
 			Result          string `json:"result"`
@@ -608,8 +647,9 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 		archiveLocation = got.ArchiveLocation
 	}
 	{
-		resp, err := testClient.Get(archiveLocation) //nolint:bodyclose // pre-existing issue from nektos/act
+		resp, err := testClient.Get(archiveLocation)
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 		got, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)

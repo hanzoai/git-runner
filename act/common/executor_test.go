@@ -21,11 +21,11 @@ func TestNewWorkflow(t *testing.T) {
 
 	// empty
 	emptyWorkflow := NewPipelineExecutor()
-	assert.Nil(emptyWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(emptyWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// error case
 	errorWorkflow := NewErrorExecutor(errors.New("test error"))
-	assert.NotNil(errorWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.Error(errorWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// multiple success case
 	runcount := 0
@@ -38,7 +38,7 @@ func TestNewWorkflow(t *testing.T) {
 			runcount++
 			return nil
 		})
-	assert.Nil(successWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(successWorkflow(ctx)) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(2, runcount)
 }
 
@@ -60,7 +60,7 @@ func TestNewConditionalExecutor(t *testing.T) {
 		return nil
 	})(ctx)
 
-	assert.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(0, trueCount)
 	assert.Equal(1, falseCount)
 
@@ -74,7 +74,7 @@ func TestNewConditionalExecutor(t *testing.T) {
 		return nil
 	})(ctx)
 
-	assert.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 	assert.Equal(1, trueCount)
 	assert.Equal(1, falseCount)
 }
@@ -105,7 +105,7 @@ func TestNewParallelExecutor(t *testing.T) {
 
 	assert.Equal(int32(3), count.Load(), "should run all 3 executors")
 	assert.Equal(int32(2), maxCount.Load(), "should run at most 2 executors in parallel")
-	assert.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// Reset to test running the executor with 0 parallelism
 	count.Store(0)
@@ -116,7 +116,7 @@ func TestNewParallelExecutor(t *testing.T) {
 
 	assert.Equal(int32(3), count.Load(), "should run all 3 executors")
 	assert.Equal(int32(1), maxCount.Load(), "should run at most 1 executors in parallel")
-	assert.Nil(errSingle) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(errSingle)
 }
 
 func TestNewParallelExecutorFailed(t *testing.T) {

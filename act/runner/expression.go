@@ -405,7 +405,6 @@ func escapeFormatString(in string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(in, "{", "{{"), "}", "}}")
 }
 
-//nolint:gocyclo // function handles many cases
 func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (string, error) { //nolint:unparam // pre-existing issue from nektos/act
 	if !strings.Contains(in, "${{") || !strings.Contains(in, "}}") {
 		return in, nil
@@ -472,7 +471,6 @@ func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (str
 	return out, nil
 }
 
-//nolint:gocyclo // function handles many cases
 func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *model.GithubContext) map[string]any {
 	inputs := map[string]any{}
 

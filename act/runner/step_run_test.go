@@ -81,7 +81,7 @@ func TestStepRun(t *testing.T) {
 	cm.On("GetContainerArchive", ctx, "/var/run/act/workflow/pathcmd.txt").Return(io.NopCloser(&bytes.Buffer{}), nil)
 
 	err := sr.main()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	cm.AssertExpectations(t)
 }
@@ -91,8 +91,8 @@ func TestStepRunPrePost(t *testing.T) {
 	sr := &stepRun{}
 
 	err := sr.pre()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	err = sr.post()(ctx)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err)
 }

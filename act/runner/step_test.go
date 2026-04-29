@@ -156,7 +156,7 @@ func TestSetupEnv(t *testing.T) {
 	sm.On("getEnv").Return(&env)
 
 	err := setupEnv(context.Background(), sm)
-	assert.Nil(t, err) //nolint:testifylint // pre-existing issue from nektos/act
+	assert.NoError(t, err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// These are commit or system specific
 	delete((env), "GITHUB_REF")
@@ -318,35 +318,35 @@ func TestIsContinueOnError(t *testing.T) {
 	step := createTestStep(t, "name: test")
 	continueOnError, err := isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.False(continueOnError)
-	assertObject.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// explcit true
 	step = createTestStep(t, "continue-on-error: true")
 	continueOnError, err = isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.True(continueOnError)
-	assertObject.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// explicit false
 	step = createTestStep(t, "continue-on-error: false")
 	continueOnError, err = isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.False(continueOnError)
-	assertObject.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// expression true
 	step = createTestStep(t, "continue-on-error: ${{ 'test' == 'test' }}")
 	continueOnError, err = isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.True(continueOnError)
-	assertObject.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// expression false
 	step = createTestStep(t, "continue-on-error: ${{ 'test' != 'test' }}")
 	continueOnError, err = isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.False(continueOnError)
-	assertObject.Nil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.NoError(err) //nolint:testifylint // pre-existing issue from nektos/act
 
 	// expression parse error
 	step = createTestStep(t, "continue-on-error: ${{ 'test' != test }}")
 	continueOnError, err = isContinueOnError(context.Background(), step.getStepModel().RawContinueOnError, step, stepStageMain)
 	assertObject.False(continueOnError)
-	assertObject.NotNil(err) //nolint:testifylint // pre-existing issue from nektos/act
+	assertObject.Error(err)
 }
