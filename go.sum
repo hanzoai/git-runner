@@ -57,6 +57,8 @@ github.com/docker/docker v25.0.13+incompatible h1:YeBrkUd3q0ZoRDNoEzuopwCLU+uD8G
 github.com/docker/docker v25.0.13+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v25.0.14+incompatible h1:+HNue3fKbqiDHYFAriyiMjfS5u25zB0E2/R8f42lOMc=
 github.com/docker/docker v25.0.14+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v25.0.15+incompatible h1:JhRD6vZdk0Ms3SEMztefBISJL13NbxudQnGix6l+T5M=
+github.com/docker/docker v25.0.15+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.9.5 h1:EFNN8DHvaiK8zVqFA2DT6BjXE0GzfLOZ38ggPTKePkY=
 github.com/docker/docker-credential-helpers v0.9.5/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
 github.com/docker/go-connections v0.6.0 h1:LlMG9azAe1TqfR7sO+NJttz1gy6KO7VJBh+pMmjSD94=
