@@ -155,7 +155,7 @@ func LoadDefault(file string) (*Config, error) {
 		cfg.Runner.FetchInterval = 2 * time.Second
 	}
 	if cfg.Runner.FetchIntervalMax <= 0 {
-		cfg.Runner.FetchIntervalMax = 60 * time.Second
+		cfg.Runner.FetchIntervalMax = 5 * time.Second
 	}
 	if cfg.Runner.LogReportInterval <= 0 {
 		cfg.Runner.LogReportInterval = 5 * time.Second

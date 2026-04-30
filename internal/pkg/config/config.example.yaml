@@ -35,7 +35,7 @@ runner:
   # The maximum interval for fetching the job from the Gitea instance.
   # The runner uses exponential backoff when idle, increasing the interval up to this maximum.
   # Set to 0 or same as fetch_interval to disable backoff.
-  fetch_interval_max: 60s
+  fetch_interval_max: 5s
   # The base interval for periodic log flush to the Gitea instance.
   # Logs may be sent earlier if the buffer reaches log_report_batch_size
   # or if log_report_max_latency expires after the first buffered row.
