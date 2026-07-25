@@ -48,13 +48,13 @@ type Cache struct {
 	Host           string `yaml:"host"`            // Host specifies the caching host.
 	Port           uint16 `yaml:"port"`            // Port specifies the caching port.
 	ExternalServer string `yaml:"external_server"` // ExternalServer specifies the URL of external cache server
-	ExternalSecret string `yaml:"external_secret"` // ExternalSecret is a shared secret between this runner and an external act_runner cache-server, enabling per-job ACTIONS_RUNTIME_TOKEN authentication and repo scoping over the network. Leave empty to keep the legacy unauthenticated behavior.
+	ExternalSecret string `yaml:"external_secret"` // ExternalSecret is a shared secret between this runner and an external git-runner cache-server, enabling per-job ACTIONS_RUNTIME_TOKEN authentication and repo scoping over the network. Leave empty to keep the legacy unauthenticated behavior.
 }
 
 // Container represents the configuration for the container.
 type Container struct {
 	Network       string        `yaml:"network"`        // Network specifies the network for the container.
-	NetworkMode   string        `yaml:"network_mode"`   // Deprecated: use Network instead. Could be removed after Gitea 1.20
+	NetworkMode   string        `yaml:"network_mode"`   // Deprecated: use Network instead. Could be removed after server 1.20
 	Privileged    bool          `yaml:"privileged"`     // Privileged indicates whether the container runs in privileged mode.
 	Options       string        `yaml:"options"`        // Options specifies additional options for the container.
 	WorkdirParent string        `yaml:"workdir_parent"` // WorkdirParent specifies the parent directory for the container's working directory.
@@ -62,8 +62,8 @@ type Container struct {
 	DockerHost    string        `yaml:"docker_host"`    // DockerHost specifies the Docker host. It overrides the value specified in environment variable DOCKER_HOST.
 	ForcePull     bool          `yaml:"force_pull"`     // Pull docker image(s) even if already present
 	ForceRebuild  bool          `yaml:"force_rebuild"`  // Rebuild docker image(s) even if already present
-	RequireDocker bool          `yaml:"require_docker"` // Always require a reachable docker daemon, even if not required by act_runner
-	DockerTimeout time.Duration `yaml:"docker_timeout"` // Timeout to wait for the docker daemon to be reachable, if docker is required by require_docker or act_runner
+	RequireDocker bool          `yaml:"require_docker"` // Always require a reachable docker daemon, even if not required by git-runner
+	DockerTimeout time.Duration `yaml:"docker_timeout"` // Timeout to wait for the docker daemon to be reachable, if docker is required by require_docker or git-runner
 	BindWorkdir   bool          `yaml:"bind_workdir"`   // BindWorkdir binds the workspace to the host filesystem instead of using Docker volumes. Required for DinD when jobs use docker compose with bind mounts.
 }
 
@@ -138,7 +138,7 @@ func LoadDefault(file string) (*Config, error) {
 			cfg.Cache.Dir = filepath.Join(home, ".cache", "actcache")
 		}
 		if cfg.Cache.ExternalServer != "" && cfg.Cache.ExternalSecret == "" {
-			return nil, errors.New("cache.external_server is set but cache.external_secret is empty; configure the same external_secret on this runner and the act_runner cache-server")
+			return nil, errors.New("cache.external_server is set but cache.external_secret is empty; configure the same external_secret on this runner and the git-runner cache-server")
 		}
 	}
 	if cfg.Container.WorkdirParent == "" {
@@ -190,7 +190,7 @@ func LoadDefault(file string) (*Config, error) {
 		if cfg.Container.NetworkMode == "bridge" {
 			// Previously, if the value of `container.network_mode` is `bridge`, we will create a new network for job.
 			// But “bridge” is easily confused with the bridge network created by Docker by default.
-			// So we set the value of `container.network` to empty string to make `act_runner` automatically create a new network for job.
+			// So we set the value of `container.network` to empty string to make `git-runner` automatically create a new network for job.
 			cfg.Container.Network = ""
 		} else {
 			cfg.Container.Network = cfg.Container.NetworkMode

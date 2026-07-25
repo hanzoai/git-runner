@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

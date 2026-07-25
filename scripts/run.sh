@@ -13,20 +13,20 @@ if [[ ! -z "${CONFIG_FILE}" ]]; then
   CONFIG_ARG="--config ${CONFIG_FILE}"
 fi
 EXTRA_ARGS=""
-if [[ ! -z "${GITEA_RUNNER_LABELS}" ]]; then
-  EXTRA_ARGS="${EXTRA_ARGS} --labels ${GITEA_RUNNER_LABELS}"
+if [[ ! -z "${GIT_RUNNER_LABELS}" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --labels ${GIT_RUNNER_LABELS}"
 fi
-if [[ ! -z "${GITEA_RUNNER_EPHEMERAL}" ]]; then
+if [[ ! -z "${GIT_RUNNER_EPHEMERAL}" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --ephemeral"
 fi
 RUN_ARGS=""
-if [[ ! -z "${GITEA_RUNNER_ONCE}" ]]; then
+if [[ ! -z "${GIT_RUNNER_ONCE}" ]]; then
   RUN_ARGS="${RUN_ARGS} --once"
 fi
 
 # In case no token is set, it's possible to read the token from a file, i.e. a Docker Secret
-if [[ -z "${GITEA_RUNNER_REGISTRATION_TOKEN}" ]] && [[ -f "${GITEA_RUNNER_REGISTRATION_TOKEN_FILE}" ]]; then
-  GITEA_RUNNER_REGISTRATION_TOKEN=$(cat "${GITEA_RUNNER_REGISTRATION_TOKEN_FILE}")
+if [[ -z "${GIT_RUNNER_REGISTRATION_TOKEN}" ]] && [[ -f "${GIT_RUNNER_REGISTRATION_TOKEN_FILE}" ]]; then
+  GIT_RUNNER_REGISTRATION_TOKEN=$(cat "${GIT_RUNNER_REGISTRATION_TOKEN_FILE}")
 fi
 
 # Use the same ENV variable names as https://github.com/vegardit/docker-gitea-act-runner
@@ -36,15 +36,15 @@ if [[ ! -s "$RUNNER_STATE_FILE" ]]; then
   try=$((try + 1))
   success=0
 
-  # The point of this loop is to make it simple, when running both act_runner and gitea in docker,
-  # for the act_runner to wait a moment for gitea to become available before erroring out.  Within
+  # The point of this loop is to make it simple, when running both git-runner and gitea in docker,
+  # for the git-runner to wait a moment for gitea to become available before erroring out.  Within
   # the context of a single docker-compose, something similar could be done via healthchecks, but
   # this is more flexible.
-  while [[ $success -eq 0 ]] && [[ $try -lt ${GITEA_MAX_REG_ATTEMPTS:-10} ]]; do
-    act_runner register \
-      --instance "${GITEA_INSTANCE_URL}" \
-      --token    "${GITEA_RUNNER_REGISTRATION_TOKEN}" \
-      --name     "${GITEA_RUNNER_NAME:-`hostname`}" \
+  while [[ $success -eq 0 ]] && [[ $try -lt ${GIT_MAX_REG_ATTEMPTS:-10} ]]; do
+    git-runner register \
+      --instance "${GIT_INSTANCE_URL}" \
+      --token    "${GIT_RUNNER_REGISTRATION_TOKEN}" \
+      --name     "${GIT_RUNNER_NAME:-`hostname`}" \
       ${CONFIG_ARG} ${EXTRA_ARGS} --no-interactive 2>&1 | tee /tmp/reg.log
 
     cat /tmp/reg.log | grep 'Runner registered successfully' > /dev/null
@@ -57,8 +57,8 @@ if [[ ! -s "$RUNNER_STATE_FILE" ]]; then
     fi
   done
 fi
-# Prevent reading the token from the act_runner process
-unset GITEA_RUNNER_REGISTRATION_TOKEN
-unset GITEA_RUNNER_REGISTRATION_TOKEN_FILE
+# Prevent reading the token from the git-runner process
+unset GIT_RUNNER_REGISTRATION_TOKEN
+unset GIT_RUNNER_REGISTRATION_TOKEN_FILE
 
-exec act_runner daemon ${CONFIG_ARG} ${RUN_ARGS}
+exec git-runner daemon ${CONFIG_ARG} ${RUN_ARGS}

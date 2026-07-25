@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/container"
-	"gitea.com/gitea/act_runner/act/exprparser"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/container"
+	"github.com/hanzoai/git-runner/act/exprparser"
+	"github.com/hanzoai/git-runner/act/model"
 )
 
 type step interface {
@@ -129,11 +129,11 @@ func runStepExecutor(step step, stage stepStage, executor common.Executor) commo
 
 		{
 			// For Gitea
-			(*step.getEnv())["GITEA_OUTPUT"] = (*step.getEnv())["GITHUB_OUTPUT"]
-			(*step.getEnv())["GITEA_STATE"] = (*step.getEnv())["GITHUB_STATE"]
-			(*step.getEnv())["GITEA_PATH"] = (*step.getEnv())["GITHUB_PATH"]
-			(*step.getEnv())["GITEA_ENV"] = (*step.getEnv())["GITHUB_ENV"]
-			(*step.getEnv())["GITEA_STEP_SUMMARY"] = (*step.getEnv())["GITHUB_STEP_SUMMARY"]
+			(*step.getEnv())["GIT_OUTPUT"] = (*step.getEnv())["GITHUB_OUTPUT"]
+			(*step.getEnv())["GIT_STATE"] = (*step.getEnv())["GITHUB_STATE"]
+			(*step.getEnv())["GIT_PATH"] = (*step.getEnv())["GITHUB_PATH"]
+			(*step.getEnv())["GIT_ENV"] = (*step.getEnv())["GITHUB_ENV"]
+			(*step.getEnv())["GIT_STEP_SUMMARY"] = (*step.getEnv())["GITHUB_STEP_SUMMARY"]
 		}
 
 		_ = rc.JobContainer.Copy(actPath, &container.FileEntry{

@@ -3,7 +3,7 @@
 
 package ver
 
-// go build -ldflags "-X gitea.com/gitea/act_runner/internal/pkg/ver.version=1.2.3"
+// go build -ldflags "-X github.com/hanzoai/git-runner/internal/pkg/ver.version=1.2.3"
 var version = "dev"
 
 func Version() string {

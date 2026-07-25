@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/filecollector"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/filecollector"
 
 	"github.com/Masterminds/semver"
 	"github.com/docker/cli/cli/compose/loader"

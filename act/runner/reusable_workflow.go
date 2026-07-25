@@ -17,9 +17,9 @@ import (
 	"strings"
 	"sync"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/common/git"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/common/git"
+	"github.com/hanzoai/git-runner/act/model"
 )
 
 func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
@@ -307,7 +307,7 @@ func setReusedWorkflowCallerResult(rc *RunContext, runner Runner) common.Executo
 }
 
 // For Gitea
-// getGitCloneToken returns GITEA_TOKEN when shouldCloneURLUseToken returns true,
+// getGitCloneToken returns GIT_TOKEN when shouldCloneURLUseToken returns true,
 // otherwise returns an empty string
 func getGitCloneToken(conf *Config, cloneURL string) string {
 	if !shouldCloneURLUseToken(conf.GitHubInstance, cloneURL) {

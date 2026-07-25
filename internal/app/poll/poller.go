@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/metrics"
+	"github.com/hanzoai/git-runner/internal/pkg/client"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/metrics"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"connectrpc.com/connect"
@@ -31,7 +31,7 @@ type Poller struct {
 	client       client.Client
 	runner       TaskRunner
 	cfg          *config.Config
-	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the Gitea.
+	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the server.
 
 	pollingCtx      context.Context
 	shutdownPolling context.CancelFunc
@@ -152,7 +152,7 @@ func (p *Poller) Shutdown(ctx context.Context) error {
 		// force a shutdown of all running jobs
 		p.shutdownJobs()
 
-		// wait for running jobs to report their status to Gitea
+		// wait for running jobs to report their status to the server
 		<-p.done
 
 		return ctx.Err()

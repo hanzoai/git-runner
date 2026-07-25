@@ -117,7 +117,7 @@ func NewParallelExecutor(parallel int, executors ...Executor) Executor {
 					log.Debugf("Worker %d executing task %d", workerID, taskCount)
 					// Recover from panics in executors to avoid crashing the worker
 					// goroutine which would leave the runner process hung.
-					// https://gitea.com/gitea/act_runner/issues/371
+					// https://github.com/hanzoai/git-runner/issues/371
 					errs <- func() (err error) {
 						defer func() {
 							if r := recover(); r != nil {

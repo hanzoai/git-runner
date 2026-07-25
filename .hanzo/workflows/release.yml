@@ -1,0 +1,25 @@
+name: Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+concurrency:
+  group: release-git-runner
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: [hanzo-build-linux-amd64]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + push ghcr.io/hanzoai/git-runner
+        env:
+          GH_TOKEN: ${{ secrets.MIRROR_GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u hanzo-dev --password-stdin
+          VER=0.6.1-hanzo.$(git rev-parse --short=7 HEAD)
+          docker build -t "ghcr.io/hanzoai/git-runner:${VER}" -t ghcr.io/hanzoai/git-runner:0.6.1 .
+          docker push "ghcr.io/hanzoai/git-runner:${VER}"
+          docker push ghcr.io/hanzoai/git-runner:0.6.1
+          echo "pushed ghcr.io/hanzoai/git-runner:${VER} (+0.6.1)"

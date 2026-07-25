@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/filecollector"
-	"gitea.com/gitea/act_runner/act/lookpath"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/filecollector"
+	"github.com/hanzoai/git-runner/act/lookpath"
 
 	"github.com/go-git/go-billy/v5/helper/polyfill"
 	"github.com/go-git/go-billy/v5/osfs"

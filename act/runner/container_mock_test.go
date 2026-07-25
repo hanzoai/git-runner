@@ -8,8 +8,8 @@ import (
 	"context"
 	"io"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/container"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/container"
 
 	"github.com/stretchr/testify/mock"
 )

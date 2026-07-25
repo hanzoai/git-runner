@@ -1,5 +1,5 @@
 DIST := dist
-EXECUTABLE := act_runner
+EXECUTABLE := git-runner
 DIST_DIRS := $(DIST)/binaries $(DIST)/release
 GO ?= go
 SHASUM ?= shasum -a 256
@@ -13,7 +13,7 @@ DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
 GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
 
-DOCKER_IMAGE ?= gitea/act_runner
+DOCKER_IMAGE ?= gitea/git-runner
 DOCKER_TAG ?= nightly
 DOCKER_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 DOCKER_ROOTLESS_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)-dind-rootless
@@ -67,7 +67,7 @@ else
 endif
 
 TAGS ?=
-LDFLAGS ?= -X "gitea.com/gitea/act_runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
+LDFLAGS ?= -X "gitea.com/gitea/git-runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
 
 .PHONY: all
 all: build
@@ -140,11 +140,11 @@ test: fmt-check security-check ## test everything
 	@$(GO) test -race -short -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 
 .PHONY: install
-install: $(GOFILES) ## install the act_runner binary via `go install`
+install: $(GOFILES) ## install the git-runner binary via `go install`
 	$(GO) install -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)'
 
 .PHONY: build
-build: go-check $(EXECUTABLE) ## build the act_runner binary
+build: go-check $(EXECUTABLE) ## build the git-runner binary
 
 $(EXECUTABLE): $(GOFILES)
 	$(GO) build -v -tags '$(TAGS)' -ldflags '-s -w $(EXTLDFLAGS) $(LDFLAGS)' -o $@

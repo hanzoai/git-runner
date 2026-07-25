@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/client/mocks"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	connect_go "connectrpc.com/connect"

@@ -16,14 +16,14 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/app/poll"
-	"gitea.com/gitea/act_runner/internal/app/run"
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/envcheck"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/metrics"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"github.com/hanzoai/git-runner/internal/app/poll"
+	"github.com/hanzoai/git-runner/internal/app/run"
+	"github.com/hanzoai/git-runner/internal/pkg/client"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/envcheck"
+	"github.com/hanzoai/git-runner/internal/pkg/labels"
+	"github.com/hanzoai/git-runner/internal/pkg/metrics"
+	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
 	"connectrpc.com/connect"
 	"github.com/mattn/go-isatty"
@@ -104,7 +104,7 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 			}
 			// if dockerSocketPath passes the check, override DOCKER_HOST with dockerSocketPath
 			os.Setenv("DOCKER_HOST", dockerSocketPath)
-			// empty cfg.Container.DockerHost means act_runner need to find an available docker host automatically
+			// empty cfg.Container.DockerHost means git-runner need to find an available docker host automatically
 			// and assign the path to cfg.Container.DockerHost
 			if cfg.Container.DockerHost == "" {
 				cfg.Container.DockerHost = dockerSocketPath
@@ -140,7 +140,7 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 		// declare the labels of the runner before fetching tasks
 		resp, err := runner.Declare(ctx, ls.Names())
 		if err != nil && connect.CodeOf(err) == connect.CodeUnimplemented {
-			log.Errorf("Your Gitea version is too old to support runner declare, please upgrade to v1.21 or later")
+			log.Errorf("Your server version is too old to support runner declare, please upgrade to v1.21 or later")
 			return err
 		} else if err != nil {
 			log.WithError(err).Error("fail to invoke Declare")

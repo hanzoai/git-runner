@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/client/mocks"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	connect_go "connectrpc.com/connect"
@@ -220,7 +220,7 @@ func TestReporter_Fire(t *testing.T) {
 }
 
 // TestReporter_EphemeralRunnerDeletion reproduces the exact scenario from
-// https://gitea.com/gitea/act_runner/issues/793:
+// https://github.com/hanzoai/git-runner/issues/793:
 //
 //  1. RunDaemon calls ReportLog(false) — runner is still alive
 //  2. Close() updates state to Result=FAILURE (between RunDaemon's ReportLog and ReportState)

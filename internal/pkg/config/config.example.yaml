@@ -20,23 +20,23 @@ runner:
   # It will be ignored if it's empty or the file doesn't exist.
   env_file: .env
   # The timeout for a job to be finished.
-  # Please note that the Gitea instance also has a timeout (3h by default) for the job.
-  # So the job could be stopped by the Gitea instance if its timeout is shorter than this.
+  # Please note that the Hanzo Git instance also has a timeout (3h by default) for the job.
+  # So the job could be stopped by the Hanzo Git instance if its timeout is shorter than this.
   timeout: 3h
   # The timeout for the runner to wait for running jobs to finish when shutting down.
   # Any running jobs that haven't finished after this timeout will be cancelled.
   shutdown_timeout: 0s
-  # Whether skip verifying the TLS certificate of the Gitea instance.
+  # Whether skip verifying the TLS certificate of the Hanzo Git instance.
   insecure: false
-  # The timeout for fetching the job from the Gitea instance.
+  # The timeout for fetching the job from the Hanzo Git instance.
   fetch_timeout: 5s
-  # The interval for fetching the job from the Gitea instance.
+  # The interval for fetching the job from the Hanzo Git instance.
   fetch_interval: 2s
-  # The maximum interval for fetching the job from the Gitea instance.
+  # The maximum interval for fetching the job from the Hanzo Git instance.
   # The runner uses exponential backoff when idle, increasing the interval up to this maximum.
   # Set to 0 or same as fetch_interval to disable backoff.
   fetch_interval_max: 5s
-  # The base interval for periodic log flush to the Gitea instance.
+  # The base interval for periodic log flush to the Hanzo Git instance.
   # Logs may be sent earlier if the buffer reaches log_report_batch_size
   # or if log_report_max_latency expires after the first buffered row.
   log_report_interval: 5s
@@ -47,7 +47,7 @@ runner:
   # Flush logs immediately when the buffer reaches this many rows.
   # This ensures bursty output (e.g., npm install) is delivered promptly.
   log_report_batch_size: 100
-  # The interval for reporting task state (step status, timing) to the Gitea instance.
+  # The interval for reporting task state (step status, timing) to the Hanzo Git instance.
   # State is also reported immediately on step transitions (start/stop).
   state_report_interval: 5s
   # The github_mirror of a runner is used to specify the mirror address of the github that pulls the action repository.

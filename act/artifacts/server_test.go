@@ -17,8 +17,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"gitea.com/gitea/act_runner/act/model"
-	"gitea.com/gitea/act_runner/act/runner"
+	"github.com/hanzoai/git-runner/act/model"
+	"github.com/hanzoai/git-runner/act/runner"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"

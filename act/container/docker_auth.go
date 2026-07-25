@@ -10,7 +10,7 @@ import (
 	"context"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/credentials"

@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"github.com/hanzoai/git-runner/internal/pkg/client"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/labels"
+	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
@@ -273,7 +273,7 @@ func printStageHelp(stage registerStage) {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputInstance:
-		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
+		log.Infoln("Enter the Hanzo Git instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
 		log.Infoln("Enter the runner token:")
 	case StageInputRunnerName:
@@ -342,11 +342,11 @@ func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs)
 		}
 		if err != nil {
 			log.WithError(err).
-				Errorln("Cannot ping the Gitea instance server")
+				Errorln("Cannot ping the Hanzo Git instance server")
 			// TODO: if ping failed, retry or exit
 			time.Sleep(time.Second)
 		} else {
-			log.Debugln("Successfully pinged the Gitea instance server")
+			log.Debugln("Successfully pinged the Hanzo Git instance server")
 			break
 		}
 	}
@@ -369,7 +369,7 @@ func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs)
 		Name:        reg.Name,
 		Token:       reg.Token,
 		Version:     ver.Version(),
-		AgentLabels: ls, // Could be removed after Gitea 1.20
+		AgentLabels: ls, // Could be removed after server 1.20
 		Labels:      ls,
 		Ephemeral:   reg.Ephemeral,
 	}))
@@ -385,7 +385,7 @@ func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs)
 
 	if inputs.Ephemeral != resp.Msg.Runner.Ephemeral {
 		// TODO we cannot remove the configuration via runner api, if we return an error here we just fill the database
-		log.Error("poller: cannot register new runner as ephemeral upgrade Gitea to gain security, run-once will be used automatically")
+		log.Error("poller: cannot register new runner as ephemeral upgrade Hanzo Git to gain security, run-once will be used automatically")
 	}
 
 	if err := config.SaveRegistration(cfg.Runner.File, reg); err != nil {

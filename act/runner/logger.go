@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/term"

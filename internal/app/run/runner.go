@@ -17,16 +17,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/artifactcache"
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
-	"gitea.com/gitea/act_runner/act/runner"
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/metrics"
-	"gitea.com/gitea/act_runner/internal/pkg/report"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"github.com/hanzoai/git-runner/act/artifactcache"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
+	"github.com/hanzoai/git-runner/act/runner"
+	"github.com/hanzoai/git-runner/internal/pkg/client"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/labels"
+	"github.com/hanzoai/git-runner/internal/pkg/metrics"
+	"github.com/hanzoai/git-runner/internal/pkg/report"
+	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"connectrpc.com/connect"
@@ -81,13 +81,13 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 	}
 
 	// set artifact gitea api
-	artifactGiteaAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
-	envs["ACTIONS_RUNTIME_URL"] = artifactGiteaAPI
+	artifactAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
+	envs["ACTIONS_RUNTIME_URL"] = artifactAPI
 	envs["ACTIONS_RESULTS_URL"] = strings.TrimSuffix(cli.Address(), "/")
 
-	// Set specific environments to distinguish between Gitea and GitHub
-	envs["GITEA_ACTIONS"] = "true"
-	envs["GITEA_ACTIONS_RUNNER_VERSION"] = ver.Version()
+	// Set specific environments to distinguish between Hanzo Git and GitHub
+	envs["GIT_ACTIONS"] = "true"
+	envs["GIT_ACTIONS_RUNNER_VERSION"] = ver.Version()
 
 	return &Runner{
 		name:         reg.Name,
@@ -188,7 +188,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		RepositoryOwner: taskContext["repository_owner"].GetStringValue(),
 		RetentionDays:   taskContext["retention_days"].GetStringValue(),
 	}
-	if t := task.Secrets["GITEA_TOKEN"]; t != "" {
+	if t := task.Secrets["GIT_TOKEN"]; t != "" {
 		preset.Token = t
 	} else if t := task.Secrets["GITHUB_TOKEN"]; t != "" {
 		preset.Token = t
@@ -202,7 +202,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	giteaRuntimeToken := taskContext["gitea_runtime_token"].GetStringValue()
 	if giteaRuntimeToken == "" {
-		// use task token to action api token for previous Gitea Server Versions
+		// use task token to action api token for previous server versions
 		giteaRuntimeToken = preset.Token
 	}
 	r.envs["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
@@ -314,7 +314,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 //     in legacy openMode and ignores the runtime token; trust is at the
 //     network layer.
 //
-// Safe with an empty token (older Gitea did not issue one).
+// Safe with an empty token (older servers did not issue one).
 func (r *Runner) registerCacheForTask(token, repo string, reporter *report.Reporter) func() {
 	if token == "" {
 		return func() {}

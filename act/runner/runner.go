@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
 
 	docker_container "github.com/docker/docker/api/types/container"
 	log "github.com/sirupsen/logrus"
@@ -84,8 +84,8 @@ type Config struct {
 // GetToken: Adapt to Gitea
 func (c Config) GetToken() string {
 	token := c.Secrets["GITHUB_TOKEN"]
-	if c.Secrets["GITEA_TOKEN"] != "" {
-		token = c.Secrets["GITEA_TOKEN"]
+	if c.Secrets["GIT_TOKEN"] != "" {
+		token = c.Secrets["GIT_TOKEN"]
 	}
 	return token
 }

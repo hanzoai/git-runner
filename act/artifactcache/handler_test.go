@@ -969,7 +969,7 @@ func TestHandler_ArtifactSignature(t *testing.T) {
 }
 
 // TestHandler_SecretPersistsAcrossRestarts is the property that lets
-// act_runner cache-server be pointed at via cfg.Cache.ExternalServer: a
+// git-runner cache-server be pointed at via cfg.Cache.ExternalServer: a
 // restart must not invalidate signed URLs the handler has already issued
 // (within their expiry window).
 func TestHandler_SecretPersistsAcrossRestarts(t *testing.T) {

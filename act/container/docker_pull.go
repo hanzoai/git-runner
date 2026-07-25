@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types"

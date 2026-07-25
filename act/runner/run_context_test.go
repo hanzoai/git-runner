@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/exprparser"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/exprparser"
+	"github.com/hanzoai/git-runner/act/model"
 
 	log "github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/assert"

@@ -6,7 +6,7 @@ package runner
 import (
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v4"

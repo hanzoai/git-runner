@@ -1,4 +1,4 @@
-## Kubernetes Docker in Docker Deployment with `act_runner`
+## Kubernetes Docker in Docker Deployment with `git-runner`
 
 NOTE: Docker in Docker (dind) requires elevated privileges on Kubernetes. The current way to achieve this is to set the pod `SecurityContext` to `privileged`. Keep in mind that this is a potential security issue that has the potential for a malicious application to break out of the container context.
 

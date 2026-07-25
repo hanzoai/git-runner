@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"

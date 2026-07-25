@@ -12,7 +12,7 @@ import (
 	"io"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 )
 
 func parseEnvFile(e Container, srcPath string, env *map[string]string) common.Executor {

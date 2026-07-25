@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"

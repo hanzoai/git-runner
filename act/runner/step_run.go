@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/container"
-	"gitea.com/gitea/act_runner/act/lookpath"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/container"
+	"github.com/hanzoai/git-runner/act/lookpath"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/kballard/go-shellquote"
 	yaml "go.yaml.in/yaml/v4"
@@ -145,7 +145,7 @@ func isInternalEnvKey(k string, caseInsensitive bool) bool {
 		return true
 	}
 	return strings.HasPrefix(upper, "GITHUB_") ||
-		strings.HasPrefix(upper, "GITEA_") ||
+		strings.HasPrefix(upper, "GIT_") ||
 		strings.HasPrefix(upper, "RUNNER_") ||
 		strings.HasPrefix(upper, "INPUT_")
 }

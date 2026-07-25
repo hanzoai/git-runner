@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/stretchr/testify/assert"
 )

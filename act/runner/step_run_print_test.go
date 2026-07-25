@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -155,7 +155,7 @@ env:
 }
 
 func TestIsInternalEnvKey(t *testing.T) {
-	for _, k := range []string{"PATH", "HOME", "CI", "GITHUB_TOKEN", "GITEA_ACTIONS", "RUNNER_OS", "INPUT_FOO"} {
+	for _, k := range []string{"PATH", "HOME", "CI", "GITHUB_TOKEN", "GIT_ACTIONS", "RUNNER_OS", "INPUT_FOO"} {
 		assert.True(t, isInternalEnvKey(k, false), k)
 	}
 	for _, k := range []string{"PATH_PREFIX", "MY_VAR", "GREETING", "HOMEPAGE"} {

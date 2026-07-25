@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Deprecated: could be removed in the future. TODO: remove it when Gitea 1.20.0 is released.
+// Deprecated: could be removed in the future. TODO: remove it when server 1.20 support drops.
 // Be compatible with old envs.
 func compatibleWithOldEnvs(fileUsed bool, cfg *Config) {
 	handleEnv := func(key string) (string, bool) {
@@ -26,25 +26,25 @@ func compatibleWithOldEnvs(fileUsed bool, cfg *Config) {
 		return "", false
 	}
 
-	if v, ok := handleEnv("GITEA_DEBUG"); ok {
+	if v, ok := handleEnv("GIT_DEBUG"); ok {
 		if b, _ := strconv.ParseBool(v); b {
 			cfg.Log.Level = "debug"
 		}
 	}
-	if v, ok := handleEnv("GITEA_TRACE"); ok {
+	if v, ok := handleEnv("GIT_TRACE"); ok {
 		if b, _ := strconv.ParseBool(v); b {
 			cfg.Log.Level = "trace"
 		}
 	}
-	if v, ok := handleEnv("GITEA_RUNNER_CAPACITY"); ok {
+	if v, ok := handleEnv("GIT_RUNNER_CAPACITY"); ok {
 		if i, _ := strconv.Atoi(v); i > 0 {
 			cfg.Runner.Capacity = i
 		}
 	}
-	if v, ok := handleEnv("GITEA_RUNNER_FILE"); ok {
+	if v, ok := handleEnv("GIT_RUNNER_FILE"); ok {
 		cfg.Runner.File = v
 	}
-	if v, ok := handleEnv("GITEA_RUNNER_ENVIRON"); ok {
+	if v, ok := handleEnv("GIT_RUNNER_ENVIRON"); ok {
 		splits := strings.Split(v, ",")
 		if cfg.Runner.Envs == nil {
 			cfg.Runner.Envs = map[string]string{}
@@ -56,7 +56,7 @@ func compatibleWithOldEnvs(fileUsed bool, cfg *Config) {
 			}
 		}
 	}
-	if v, ok := handleEnv("GITEA_RUNNER_ENV_FILE"); ok {
+	if v, ok := handleEnv("GIT_RUNNER_ENV_FILE"); ok {
 		cfg.Runner.EnvFile = v
 	}
 }

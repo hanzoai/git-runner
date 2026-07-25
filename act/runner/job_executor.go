@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
 )
 
 type jobInfo interface {
@@ -136,7 +136,7 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 			// if !rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == "" {
 			// 	// clean network in docker mode only
 			// 	// if the value of `ContainerNetworkMode` is empty string,
-			// 	// it means that the network to which containers are connecting is created by `act_runner`,
+			// 	// it means that the network to which containers are connecting is created by `git-runner`,
 			// 	// so, we should remove the network at last.
 			// 	networkName, _ := rc.networkName()
 			// 	logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)

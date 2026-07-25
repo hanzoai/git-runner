@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
 )
 
 func evaluateCompositeInputAndEnv(ctx context.Context, parent *RunContext, step actionStep) map[string]string {

@@ -8,16 +8,16 @@ import (
 	"fmt"
 	"os"
 
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"github.com/hanzoai/git-runner/internal/pkg/config"
+	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
 	"github.com/spf13/cobra"
 )
 
 func Execute(ctx context.Context) {
-	// ./act_runner
+	// ./git-runner
 	rootCmd := &cobra.Command{
-		Use:          "act_runner [event name to run]\nIf no event name passed, will default to \"on: push\"",
+		Use:          "git-runner [event name to run]\nIf no event name passed, will default to \"on: push\"",
 		Short:        "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
 		Args:         cobra.MaximumNArgs(1),
 		Version:      ver.Version(),
@@ -26,7 +26,7 @@ func Execute(ctx context.Context) {
 	configFile := ""
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Config file path")
 
-	// ./act_runner register
+	// ./git-runner register
 	var regArgs registerArgs
 	registerCmd := &cobra.Command{
 		Use:   "register",
@@ -35,14 +35,14 @@ func Execute(ctx context.Context) {
 		RunE:  runRegister(ctx, &regArgs, &configFile), // must use a pointer to regArgs
 	}
 	registerCmd.Flags().BoolVar(&regArgs.NoInteractive, "no-interactive", false, "Disable interactive mode")
-	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Gitea instance address")
+	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Hanzo Git instance address")
 	registerCmd.Flags().StringVar(&regArgs.Token, "token", "", "Runner token")
 	registerCmd.Flags().StringVar(&regArgs.RunnerName, "name", "", "Runner name")
 	registerCmd.Flags().StringVar(&regArgs.Labels, "labels", "", "Runner tags, comma separated")
 	registerCmd.Flags().BoolVar(&regArgs.Ephemeral, "ephemeral", false, "Configure the runner to be ephemeral and only ever be able to pick a single job (stricter than --once)")
 	rootCmd.AddCommand(registerCmd)
 
-	// ./act_runner daemon
+	// ./git-runner daemon
 	var daemArgs daemonArgs
 	daemonCmd := &cobra.Command{
 		Use:   "daemon",
@@ -53,10 +53,10 @@ func Execute(ctx context.Context) {
 	daemonCmd.Flags().BoolVar(&daemArgs.Once, "once", false, "Run one job then exit")
 	rootCmd.AddCommand(daemonCmd)
 
-	// ./act_runner exec
+	// ./git-runner exec
 	rootCmd.AddCommand(loadExecCmd(ctx))
 
-	// ./act_runner config
+	// ./git-runner config
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "generate-config",
 		Short: "Generate an example config file",
@@ -66,7 +66,7 @@ func Execute(ctx context.Context) {
 		},
 	})
 
-	// ./act_runner cache-server
+	// ./git-runner cache-server
 	var cacheArgs cacheServerArgs
 	cacheCmd := &cobra.Command{
 		Use:   "cache-server",

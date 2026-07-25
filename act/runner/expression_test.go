@@ -8,8 +8,8 @@ import (
 	"context"
 	"testing"
 
-	"gitea.com/gitea/act_runner/act/exprparser"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/exprparser"
+	"github.com/hanzoai/git-runner/act/model"
 
 	assert "github.com/stretchr/testify/assert"
 	yaml "go.yaml.in/yaml/v4"

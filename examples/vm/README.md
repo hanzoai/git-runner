@@ -1,4 +1,4 @@
-## `act_runner` on Virtual or Physical Servers
+## `git-runner` on Virtual or Physical Servers
 
 Files in this directory:
 

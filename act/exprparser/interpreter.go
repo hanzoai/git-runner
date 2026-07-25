@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"strings"
 
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/rhysd/actionlint"
 )

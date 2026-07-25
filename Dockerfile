@@ -9,8 +9,8 @@ RUN apk add --no-cache make git
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY:-}
 
-COPY . /opt/src/act_runner
-WORKDIR /opt/src/act_runner
+COPY . /opt/src/git-runner
+WORKDIR /opt/src/git-runner
 
 RUN make clean && make build
 
@@ -21,7 +21,7 @@ FROM docker:28-dind AS dind
 
 RUN apk add --no-cache s6 bash git tzdata
 
-COPY --from=builder /opt/src/act_runner/act_runner /usr/local/bin/act_runner
+COPY --from=builder /opt/src/git-runner/git-runner /usr/local/bin/git-runner
 COPY scripts/run.sh /usr/local/bin/run.sh
 COPY scripts/s6 /etc/s6
 
@@ -37,7 +37,7 @@ FROM docker:28-dind-rootless AS dind-rootless
 USER root
 RUN apk add --no-cache s6 bash git tzdata
 
-COPY --from=builder /opt/src/act_runner/act_runner /usr/local/bin/act_runner
+COPY --from=builder /opt/src/git-runner/git-runner /usr/local/bin/git-runner
 COPY scripts/run.sh /usr/local/bin/run.sh
 COPY scripts/s6 /etc/s6
 
@@ -56,7 +56,7 @@ ENTRYPOINT ["s6-svscan","/etc/s6"]
 FROM alpine AS basic
 RUN apk add --no-cache tini bash git tzdata
 
-COPY --from=builder /opt/src/act_runner/act_runner /usr/local/bin/act_runner
+COPY --from=builder /opt/src/git-runner/git-runner /usr/local/bin/git-runner
 COPY scripts/run.sh /usr/local/bin/run.sh
 
 VOLUME /data

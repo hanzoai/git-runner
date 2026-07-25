@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/container"
-	"gitea.com/gitea/act_runner/act/exprparser"
-	"gitea.com/gitea/act_runner/act/model"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/container"
+	"github.com/hanzoai/git-runner/act/exprparser"
+	"github.com/hanzoai/git-runner/act/model"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -381,7 +381,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 						if createAndDeleteNetwork {
 							// clean network if it has been created by act
 							// if using service containers
-							// it means that the network to which containers are connecting is created by `act_runner`,
+							// it means that the network to which containers are connecting is created by `git-runner`,
 							// so, we should remove the network at last.
 							logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
 							if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {

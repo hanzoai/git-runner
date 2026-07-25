@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/artifactcache"
-	"gitea.com/gitea/act_runner/act/artifacts"
-	"gitea.com/gitea/act_runner/act/common"
-	"gitea.com/gitea/act_runner/act/model"
-	"gitea.com/gitea/act_runner/act/runner"
+	"github.com/hanzoai/git-runner/act/artifactcache"
+	"github.com/hanzoai/git-runner/act/artifacts"
+	"github.com/hanzoai/git-runner/act/common"
+	"github.com/hanzoai/git-runner/act/model"
+	"github.com/hanzoai/git-runner/act/runner"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/joho/godotenv"
@@ -455,7 +455,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 
 		config.Env["ACT_EXEC"] = "true"
 
-		if t := config.Secrets["GITEA_TOKEN"]; t != "" {
+		if t := config.Secrets["GIT_TOKEN"]; t != "" {
 			config.Token = t
 		} else if t := config.Secrets["GITHUB_TOKEN"]; t != "" {
 			config.Token = t
@@ -526,7 +526,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.PersistentFlags().BoolVarP(&execArg.dryrun, "dryrun", "n", false, "dryrun mode")
 	execCmd.PersistentFlags().StringVarP(&execArg.image, "image", "i", "docker.gitea.com/runner-images:ubuntu-latest", "Docker image to use. Use \"-self-hosted\" to run directly on the host.")
 	execCmd.PersistentFlags().StringVarP(&execArg.network, "network", "", "", "Specify the network to which the container will connect")
-	execCmd.PersistentFlags().StringVarP(&execArg.githubInstance, "gitea-instance", "", "", "Gitea instance to use.")
+	execCmd.PersistentFlags().StringVarP(&execArg.githubInstance, "gitea-instance", "", "", "Hanzo Git instance to use.")
 
 	return execCmd
 }

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"gitea.com/gitea/act_runner/act/common"
+	"github.com/hanzoai/git-runner/act/common"
 
 	"github.com/julienschmidt/httprouter"
 )
