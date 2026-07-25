@@ -497,7 +497,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.Flags().BoolVarP(&execArg.runList, "list", "l", false, "list workflows")
 	execCmd.Flags().StringVarP(&execArg.job, "job", "j", "", "run a specific job ID")
 	execCmd.Flags().StringVarP(&execArg.event, "event", "E", "", "run a event name")
-	execCmd.PersistentFlags().StringVarP(&execArg.workflowsPath, "workflows", "W", "./.gitea/workflows/", "path to workflow file(s)")
+	execCmd.PersistentFlags().StringVarP(&execArg.workflowsPath, "workflows", "W", "./.hanzo/workflows/", "path to workflow file(s)")
 	execCmd.PersistentFlags().StringVarP(&execArg.workdir, "directory", "C", ".", "working directory")
 	execCmd.PersistentFlags().BoolVarP(&execArg.noWorkflowRecurse, "no-recurse", "", false, "Flag to disable running workflows from subdirectories of specified path in '--workflows'/'-W' flag")
 	execCmd.Flags().BoolVarP(&execArg.autodetectEvent, "detect-event", "", false, "Use first event type from workflow as event that triggered the workflow")

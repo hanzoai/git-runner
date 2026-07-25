@@ -114,7 +114,7 @@ formatters:
       custom-order: true
       sections:
         - standard
-        - prefix(gitea.com/gitea/act_runner)
+        - prefix(github.com/hanzoai/git-runner)
         - blank
         - default
     gofumpt:

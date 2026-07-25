@@ -29,7 +29,6 @@ if [[ -z "${GIT_RUNNER_REGISTRATION_TOKEN}" ]] && [[ -f "${GIT_RUNNER_REGISTRATI
   GIT_RUNNER_REGISTRATION_TOKEN=$(cat "${GIT_RUNNER_REGISTRATION_TOKEN_FILE}")
 fi
 
-# Use the same ENV variable names as https://github.com/vegardit/docker-gitea-act-runner
 test -f "$RUNNER_STATE_FILE" || echo "$RUNNER_STATE_FILE is missing or not a regular file"
 
 if [[ ! -s "$RUNNER_STATE_FILE" ]]; then

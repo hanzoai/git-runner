@@ -40,7 +40,7 @@ cpu.out
 *.db
 *.log
 
-/act_runner
+/git-runner
 /debug
 
 /bin

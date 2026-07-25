@@ -101,7 +101,6 @@ func LoadDefault(file string) (*Config, error) {
 			return nil, fmt.Errorf("parse config file %q: %w", file, err)
 		}
 	}
-	compatibleWithOldEnvs(file != "", cfg)
 
 	if cfg.Runner.EnvFile != "" {
 		if stat, err := os.Stat(cfg.Runner.EnvFile); err == nil && !stat.IsDir() {

@@ -67,7 +67,7 @@ else
 endif
 
 TAGS ?=
-LDFLAGS ?= -X "gitea.com/gitea/git-runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
+LDFLAGS ?= -X "github.com/hanzoai/git-runner/internal/pkg/ver.version=v$(RELASE_VERSION)"
 
 .PHONY: all
 all: build
