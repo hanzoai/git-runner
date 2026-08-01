@@ -887,8 +887,15 @@ func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext
 				instance = "https://" + instance
 			}
 			ghc.ServerURL = instance
-			ghc.APIURL = instance + "/api/v1" // the version of Gitea is v1
-			ghc.GraphQLURL = ""               // Gitea doesn't support graphql
+			// The server tells us where its API lives (github context "api_url");
+			// only fall back to the upstream Gitea layout when it says nothing.
+			// Hardcoding the suffix here silently discards a server that serves
+			// its API anywhere else, and every octokit-based action then 404s.
+			ghc.APIURL = preset.APIURL
+			if ghc.APIURL == "" {
+				ghc.APIURL = instance + "/api/v1" // the version of Gitea is v1
+			}
+			ghc.GraphQLURL = "" // Gitea doesn't support graphql
 			return ghc
 		}
 	}
@@ -1028,8 +1035,14 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 			instance = "https://" + instance
 		}
 		env["GITHUB_SERVER_URL"] = instance
-		env["GITHUB_API_URL"] = instance + "/api/v1" // the version of Gitea is v1
-		env["GITHUB_GRAPHQL_URL"] = ""               // Gitea doesn't support graphql
+		// GITHUB_API_URL was set from the resolved context just above; keep it.
+		// Recomputing the suffix here overrode both the server-supplied api_url
+		// and the GITHUB_API_URL user override, so $GITHUB_API_URL disagreed with
+		// ${{ github.api_url }} — and octokit actions read the env one.
+		if env["GITHUB_API_URL"] == "" {
+			env["GITHUB_API_URL"] = instance + "/api/v1" // the version of Gitea is v1
+		}
+		env["GITHUB_GRAPHQL_URL"] = "" // Gitea doesn't support graphql
 		env["GITHUB_RUN_ATTEMPT"] = github.RunAttempt
 	}
 
