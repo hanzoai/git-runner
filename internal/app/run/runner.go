@@ -222,6 +222,10 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		Token:           taskContext["token"].GetStringValue(),
 		RepositoryOwner: taskContext["repository_owner"].GetStringValue(),
 		RetentionDays:   taskContext["retention_days"].GetStringValue(),
+		// The server declares where its API lives. Dropping it here left
+		// APIURL empty, so act fell back to <instance>/api/v1 and every
+		// octokit-based action 404'd on a server that serves it elsewhere.
+		APIURL: taskContext["api_url"].GetStringValue(),
 	}
 	if t := task.Secrets["GIT_TOKEN"]; t != "" {
 		preset.Token = t
