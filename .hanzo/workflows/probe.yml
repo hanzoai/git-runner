@@ -1,0 +1,29 @@
+# What the runner actually hands a job. Dispatch this instead of guessing:
+# the API URL and the job token are the two things every octokit-based action
+# depends on, and neither is visible from outside a running job.
+name: Probe
+on:
+  workflow_dispatch: {}
+jobs:
+  probe:
+    runs-on: [hanzo-build-linux-amd64]
+    timeout-minutes: 10
+    steps:
+      - name: Report the github env and whether the job token can read the API
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "PROBE_API_URL=$GITHUB_API_URL"
+          echo "PROBE_SERVER_URL=$GITHUB_SERVER_URL"
+          echo "PROBE_REPOSITORY=$GITHUB_REPOSITORY"
+          echo -n "PROBE_WITH_TOKEN="
+          curl -s -o /dev/null -w '%{http_code}\n' \
+            -H "Authorization: token ${TOKEN}" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+          echo -n "PROBE_NO_TOKEN="
+          curl -s -o /dev/null -w '%{http_code}\n' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+          echo -n "PROBE_V1_WITH_TOKEN="
+          curl -s -o /dev/null -w '%{http_code}\n' \
+            -H "Authorization: token ${TOKEN}" \
+            "$GITHUB_SERVER_URL/v1/repos/$GITHUB_REPOSITORY"
