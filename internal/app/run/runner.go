@@ -132,12 +132,47 @@ func (r *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	return nil
 }
 
-// getDefaultActionsURL
-// when DEFAULT_ACTIONS_URL == "https://github.com" and GithubMirror is not blank,
-// it should be set to GithubMirror first.
+// defaultActionsURLFallback is used when the server sends no actions URL at all.
+// It must never be empty: an empty value produces "https:///actions/checkout",
+// which fails as `http: no Host in request URL`.
+const defaultActionsURLFallback = "https://github.com"
+
+// getDefaultActionsURL resolves where `uses: owner/repo@ref` is fetched from.
+//
+// The value normally arrives in the task context as gitea_default_actions_url.
+// When DEFAULT_ACTIONS_URL is "https://github.com" and github_mirror is set, the
+// mirror wins.
+//
+// ⛔ The empty case is the one that matters. GetStringValue() returns "" when the
+// field is absent from the task context — which is what our forge does — and the
+// old code returned that "" unchanged. act then builds every action URL by
+// concatenating it:
+//
+//	☁  git clone 'https:///actions/checkout' # ref=v4
+//	Unable to clone: Get "https:///actions/checkout/info/refs?service=git-upload-pack":
+//	http: no Host in request URL
+//
+// Three slashes, no host. The job dies before its first step, so a runner can
+// only execute a workflow whose actions are ALREADY in its local act cache.
+// Measured across our fleet on 2026-08-01: four of ten runners held ZERO cached
+// actions while others held 6-20, so whether a build passed depended on which
+// runner claimed it — hanzoai/bot has a success and a failure recorded against
+// the same commit.
+//
+// github_mirror could not rescue this: it is only consulted when the value is
+// EXACTLY "https://github.com", so an empty value fell straight through.
+//
+// Falling back keeps the runner correct no matter what the server sends, which
+// is the right place for this — the runner is what constructs the URL.
 func (r *Runner) getDefaultActionsURL(task *runnerv1.Task) string {
 	giteaDefaultActionsURL := task.Context.Fields["gitea_default_actions_url"].GetStringValue()
-	if giteaDefaultActionsURL == "https://github.com" && r.cfg.Runner.GithubMirror != "" {
+	if giteaDefaultActionsURL == "" {
+		if r.cfg.Runner.GithubMirror != "" {
+			return r.cfg.Runner.GithubMirror
+		}
+		return defaultActionsURLFallback
+	}
+	if giteaDefaultActionsURL == defaultActionsURLFallback && r.cfg.Runner.GithubMirror != "" {
 		return r.cfg.Runner.GithubMirror
 	}
 	return giteaDefaultActionsURL
