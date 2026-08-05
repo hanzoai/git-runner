@@ -471,6 +471,28 @@ func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (str
 	return out, nil
 }
 
+
+// truthy renders a workflow input to the bool its `type: boolean` declares.
+//
+// The value reaches us as an `any`, and what it holds depends on how the
+// forge sent it: a workflow_dispatch input arrives as the string "true"
+// (a form value), a workflow_call input arrives as a real JSON bool, and a
+// default falls back to WorkflowCallInput.Default, which the model types as
+// a string. The old code compared the interface against the literal "true",
+// which is only correct for the first of those three — `any(true) == "true"`
+// is false in Go, so EVERY workflow_call boolean resolved to false, whether
+// it came from a default or from an explicitly passed value.
+//
+// That is not cosmetic: on git.hanzo.ai it silently disabled every publish
+// gate written as `if: inputs.push`, so builds went green having pushed
+// nothing.
+func truthy(value any) bool {
+	if b, ok := value.(bool); ok {
+		return b
+	}
+	return fmt.Sprintf("%v", value) == "true"
+}
+
 func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *model.GithubContext) map[string]any {
 	inputs := map[string]any{}
 
@@ -498,7 +520,7 @@ func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *mod
 					value = v.Default
 				}
 				if v.Type == "boolean" {
-					inputs[k] = value == "true"
+					inputs[k] = truthy(value)
 				} else {
 					inputs[k] = value
 				}
@@ -515,7 +537,7 @@ func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *mod
 					value = v.Default
 				}
 				if v.Type == "boolean" {
-					inputs[k] = value == "true"
+					inputs[k] = truthy(value)
 				} else {
 					inputs[k] = value
 				}
