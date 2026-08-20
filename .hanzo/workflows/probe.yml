@@ -27,3 +27,27 @@ jobs:
           curl -s -o /dev/null -w '%{http_code}\n' \
             -H "Authorization: token ${TOKEN}" \
             "$GITHUB_SERVER_URL/v1/repos/$GITHUB_REPOSITORY"
+
+  # Where a step-level `uses:` is fetched from, and what goes on the wire with
+  # it. The same action, at the same ref, from two hosts: git.hanzo.ai is the
+  # forge this runner serves, github.com is a third party that happens to hold
+  # a mirror of it. Read the clone line in this job's log —
+  #
+  #   ☁  git clone 'https://git.hanzo.ai/hanzoai/ci' # ref=v1 authenticated
+  #   ☁  git clone 'https://github.com/hanzoai/ci'   # ref=v1 anonymous
+  #
+  # — and you have both halves of the rule the runner enforces: the forge's
+  # credential goes to the forge and nowhere else. The forge answers 401 to an
+  # anonymous fetch, so the first line succeeding is itself the proof it was
+  # authenticated, and the third party succeeding proves anonymous still works.
+  uses:
+    runs-on: [hanzo-build-linux-amd64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: The forge, by the host it publishes
+        uses: https://git.hanzo.ai/hanzoai/ci/.github/actions/imgver@v1
+        with: { repo: ghcr.io/hanzoai/git-runner, version: 0.6.1 }
+      - name: A third party, holding the very same action
+        uses: https://github.com/hanzoai/ci/.github/actions/imgver@v1
+        with: { repo: ghcr.io/hanzoai/git-runner, version: 0.6.1 }

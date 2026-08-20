@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"runtime"
 	"sync"
@@ -54,7 +55,8 @@ type Config struct {
 	ContainerDaemonSocket              string                       // Path to Docker daemon socket
 	ContainerOptions                   string                       // Options for the job container
 	UseGitIgnore                       bool                         // controls if paths in .gitignore should not be copied into container, default true
-	GitHubInstance                     string                       // GitHub instance to use, default "github.com"
+	GitHubInstance                     string                       // the instance address the runner dials, default "github.com"
+	ServerURL                          string                       // the address the instance publishes for itself, when it declares one
 	ContainerCapAdd                    []string                     // list of kernel capabilities to add to the containers
 	ContainerCapDrop                   []string                     // list of kernel capabilities to remove from the containers
 	AutoRemove                         bool                         // controls if the container is automatically removed upon workflow completion
@@ -88,6 +90,48 @@ func (c Config) GetToken() string {
 		token = c.Secrets["GIT_TOKEN"]
 	}
 	return token
+}
+
+// isInstance reports whether rawURL names the instance this runner is
+// registered to.
+//
+// One instance, two addresses. GitHubInstance is the address the runner dials;
+// ServerURL is the address the instance publishes for itself, and only the
+// instance ever says what that is. They differ whenever the two are reached by
+// different names — a runner inside the cluster dials the service, while a
+// `uses:` written by a human names the public host — and both of them are the
+// same instance.
+//
+// Hosts compare whole. A host that merely ENDS in ours is a different host, so
+// git.hanzo.ai.example.com does not match git.hanzo.ai; neither does a URL
+// carrying our host anywhere but in its host, such as in userinfo or in a path.
+// An address with no host names nothing and matches nothing. Everything this
+// says no to is somebody else's machine.
+func (c Config) isInstance(rawURL string) bool {
+	target, err := url.Parse(rawURL)
+	if err != nil || target.Host == "" {
+		return false
+	}
+	for _, address := range []string{c.GitHubInstance, c.ServerURL} {
+		if u, err := url.Parse(address); err == nil && u.Host == target.Host {
+			return true
+		}
+	}
+	return false
+}
+
+// getGitCloneToken returns the instance's own credential for a clone from the
+// instance, and an empty string for every other host — so an action fetched
+// from github.com is cloned anonymously, exactly as it is today.
+//
+// A cloneURL that already carries basic auth was handed a credential by whoever
+// wrote it, and keeps that one.
+func getGitCloneToken(conf *Config, cloneURL string) string {
+	u, err := url.Parse(cloneURL)
+	if err != nil || u.User != nil || !conf.isInstance(cloneURL) {
+		return ""
+	}
+	return conf.GetToken()
 }
 
 type caller struct {

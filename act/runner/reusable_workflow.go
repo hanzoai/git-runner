@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -304,31 +303,4 @@ func setReusedWorkflowCallerResult(rc *RunContext, runner Runner) common.Executo
 
 		return nil
 	}
-}
-
-// For Gitea
-// getGitCloneToken returns GIT_TOKEN when shouldCloneURLUseToken returns true,
-// otherwise returns an empty string
-func getGitCloneToken(conf *Config, cloneURL string) string {
-	if !shouldCloneURLUseToken(conf.GitHubInstance, cloneURL) {
-		return ""
-	}
-	return conf.GetToken()
-}
-
-// For Gitea
-// shouldCloneURLUseToken returns true when the following conditions are met:
-// 1. cloneURL is from the same Gitea instance that the runner is registered to
-// 2. the cloneURL does not have basic auth embedded
-func shouldCloneURLUseToken(instanceURL, cloneURL string) bool {
-	u1, err1 := url.Parse(instanceURL)
-	u2, err2 := url.Parse(cloneURL)
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	if u2.User != nil {
-		return false
-	}
-
-	return u1.Host == u2.Host
 }

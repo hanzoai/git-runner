@@ -264,19 +264,19 @@ func (sar *stepActionRemote) getCompositeSteps() *compositeSteps {
 }
 
 // For Gitea
-// cloneSkipTLS returns true if the runner can clone an action from the Gitea instance
+// cloneSkipTLS reports whether this action's clone may skip certificate
+// verification. Only the instance's own certificate is exempt, and only when the
+// operator has declared the instance insecure. An action with no URL of its own
+// comes from the default action instance.
 func (sar *stepActionRemote) cloneSkipTLS() bool {
-	if !sar.RunContext.Config.InsecureSkipTLS {
-		// Return false if the Gitea instance is not an insecure instance
+	conf := sar.RunContext.Config
+	if !conf.InsecureSkipTLS {
 		return false
 	}
 	if sar.remoteAction.URL == "" {
-		// Empty URL means the default action instance should be used
-		// Return true if the URL of the Gitea instance is the same as the URL of the default action instance
-		return sar.RunContext.Config.DefaultActionInstance == sar.RunContext.Config.GitHubInstance
+		return conf.isInstance(conf.DefaultActionInstance)
 	}
-	// Return true if the URL of the remote action is the same as the URL of the Gitea instance
-	return sar.remoteAction.URL == sar.RunContext.Config.GitHubInstance
+	return conf.isInstance(sar.remoteAction.URL)
 }
 
 type remoteAction struct {

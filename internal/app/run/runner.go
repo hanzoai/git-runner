@@ -293,6 +293,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		Env:                   r.envs,
 		Secrets:               task.Secrets,
 		GitHubInstance:        strings.TrimSuffix(r.client.Address(), "/"),
+		ServerURL:             taskContext["server_url"].GetStringValue(),
 		AutoRemove:            true,
 		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,

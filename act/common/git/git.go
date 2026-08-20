@@ -305,7 +305,14 @@ func gitOptions(token string) (fetchOptions git.FetchOptions, pullOptions git.Pu
 func NewGitCloneExecutor(input NewGitCloneExecutorInput) common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
-		logger.Infof("  \u2601  git clone '%s' # ref=%s", input.URL, input.Ref)
+		// Say which of the two this was. Whether a credential went to a host is
+		// the one thing about a clone that cannot be recovered afterwards, and
+		// every job log is where a fleet gets read.
+		sent := "anonymous"
+		if input.Token != "" {
+			sent = "authenticated"
+		}
+		logger.Infof("  \u2601  git clone '%s' # ref=%s %s", input.URL, input.Ref, sent)
 		logger.Debugf("  cloning %s to %s", input.URL, input.Dir)
 
 		defer acquireCloneLock(input.Dir)()
