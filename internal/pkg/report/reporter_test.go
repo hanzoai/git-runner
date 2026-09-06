@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReporter_parseLogRow(t *testing.T) {
+func TestReporter_parseLine(t *testing.T) {
 	tests := []struct {
 		name               string
 		debugOutputEnabled bool
@@ -145,7 +145,7 @@ func TestReporter_parseLogRow(t *testing.T) {
 				debugOutputEnabled: tt.debugOutputEnabled,
 			}
 			for idx, arg := range tt.args {
-				rv, ok := r.parseLogRow(&log.Entry{Message: arg})
+				rv, ok := r.parseLine(&log.Entry{Message: arg})
 				got := "<nil>"
 
 				if ok {
@@ -161,9 +161,9 @@ func TestReporter_parseLogRow(t *testing.T) {
 func TestReporter_Fire(t *testing.T) {
 	t.Run("ignore command lines", func(t *testing.T) {
 		client := mocks.NewClient(t)
-		client.On("Logs", mock.Anything, mock.Anything).Return(func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
-			t.Logf("Received logs: index %d, %d rows", in.Index, len(in.Rows))
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+		client.On("Log", mock.Anything, mock.Anything).Return(func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
+			t.Logf("Received logs: index %d, %d rows", in.Index, len(in.Lines))
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		})
 		client.On("State", mock.Anything, mock.Anything).Return(func(_ context.Context, in *forge.StateIn) (*forge.StateOut, error) {
 			t.Logf("Received state: task %d, result %q", in.State.ID, in.State.Result)
@@ -171,7 +171,7 @@ func TestReporter_Fire(t *testing.T) {
 		})
 		ctx, cancel := context.WithCancel(context.Background())
 		cfg, _ := config.LoadDefault("")
-		reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+		reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 		reporter.RunDaemon()
 		defer func() {
 			require.NoError(t, reporter.Close(""))
@@ -222,12 +222,12 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 	runnerDeleted := false
 
 	client := mocks.NewClient(t)
-	client.On("Logs", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+	client.On("Log", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
 			if runnerDeleted {
 				return nil, errors.New("runner has been deleted")
 			}
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		},
 	)
 	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
@@ -243,7 +243,7 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 
 	// Fire a log entry to create pending data
@@ -265,11 +265,11 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 		}
 	}
 	reporter.state.Result = forge.Failure
-	reporter.logRows = append(reporter.logRows, forge.Row{
-		Time:    time.Now(),
+	reporter.logLines = append(reporter.logLines, forge.Line{
+		Time:    time.Now().UnixNano(),
 		Content: "Early termination",
 	})
-	reporter.state.Stopped = time.Now()
+	reporter.state.Stopped = time.Now().UnixNano()
 	reporter.stateMu.Unlock()
 
 	// Step 3: RunDaemon's ReportState() — with the fix, this returns early
@@ -290,9 +290,9 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 
 func TestReporter_RunDaemonClose_Race(t *testing.T) {
 	client := mocks.NewClient(t)
-	client.On("Logs", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+	client.On("Log", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		},
 	)
 	client.On("State", mock.Anything, mock.Anything).Return(
@@ -303,7 +303,7 @@ func TestReporter_RunDaemonClose_Race(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 
 	// Start the daemon loop — RunDaemon spawns a goroutine internally.
@@ -325,10 +325,10 @@ func TestReporter_MaxLatencyTimer(t *testing.T) {
 	var updateLogCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("Logs", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+	client.On("Log", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
 			updateLogCalls.Add(1)
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		},
 	)
 	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
@@ -346,7 +346,7 @@ func TestReporter_MaxLatencyTimer(t *testing.T) {
 	cfg.Runner.LogReportMaxLatency = 100 * time.Millisecond
 	cfg.Runner.LogReportBatchSize = 1000 // won't trigger batch flush
 
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -372,10 +372,10 @@ func TestReporter_BatchSizeFlush(t *testing.T) {
 	var updateLogCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("Logs", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+	client.On("Log", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
 			updateLogCalls.Add(1)
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		},
 	)
 	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
@@ -393,7 +393,7 @@ func TestReporter_BatchSizeFlush(t *testing.T) {
 	cfg.Runner.LogReportMaxLatency = 10 * time.Second
 	cfg.Runner.LogReportBatchSize = 5
 
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -438,7 +438,7 @@ func TestReporter_StateChangedNotLostDuringReport(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(2)
 
 	// Mark stateChanged=true so the first ReportState proceeds to UpdateTask.
@@ -497,7 +497,7 @@ func TestReporter_StateChangedRestoredOnError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 
 	reporter.stateMu.Lock()
@@ -523,9 +523,9 @@ func TestReporter_StateNotifyFlush(t *testing.T) {
 	var updateTaskCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("Logs", mock.Anything, mock.Anything).Maybe().Return(
-		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
-			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
+	client.On("Log", mock.Anything, mock.Anything).Maybe().Return(
+		func(_ context.Context, in *forge.LogIn) (*forge.LogOut, error) {
+			return &forge.LogOut{Ack: in.Index + int64(len(in.Lines))}, nil
 		},
 	)
 	client.On("State", mock.Anything, mock.Anything).Return(
@@ -543,7 +543,7 @@ func TestReporter_StateNotifyFlush(t *testing.T) {
 	cfg.Runner.StateReportInterval = 10 * time.Second
 	cfg.Runner.LogReportInterval = 10 * time.Second
 
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -583,7 +583,7 @@ func TestReporter_StateHeartbeat(t *testing.T) {
 	defer cancel()
 	cfg, _ := config.LoadDefault("")
 	cfg.Runner.StateReportInterval = 50 * time.Millisecond
-	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{}, cfg)
 	reporter.ResetSteps(1)
 
 	// First call has no prior report — sends to seed lastReportedAt.

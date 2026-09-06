@@ -316,8 +316,11 @@ func registerNoInteractive(ctx context.Context, configFile string, regArgs *regi
 }
 
 func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs) error {
-	// initial http client
-	cli := client.New(inputs.InstanceAddr, cfg.Runner.Insecure, "", "")
+	// No credential yet: minting one is what Register is for.
+	cli, err := client.New(inputs.InstanceAddr, forge.Credential{}, cfg.Runner.Insecure, cfg.Runner.FetchTimeout)
+	if err != nil {
+		return err
+	}
 
 	reg := &config.Registration{
 		Name:      inputs.RunnerName,

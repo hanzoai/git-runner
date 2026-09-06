@@ -27,13 +27,12 @@ func generateWorkflow(task *forge.Task) (*model.Workflow, string, error) {
 	jobID := jobIDs[0]
 
 	needJobIDs := make([]string, 0, len(task.Needs))
-	for id, need := range task.Needs {
-		needJobIDs = append(needJobIDs, id)
-		needJob := &model.Job{
-			Outputs: need.Outputs,
+	for _, need := range task.Needs {
+		needJobIDs = append(needJobIDs, need.Job)
+		workflow.Jobs[need.Job] = &model.Job{
+			Outputs: index(need.Outputs),
 			Result:  string(need.Result),
 		}
-		workflow.Jobs[id] = needJob
 	}
 	sort.Strings(needJobIDs)
 

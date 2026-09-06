@@ -28,7 +28,8 @@ runner:
   shutdown_timeout: 0s
   # Whether skip verifying the TLS certificate of the Hanzo Git instance.
   insecure: false
-  # The timeout for fetching the job from the Hanzo Git instance.
+  # How long to wait for the Hanzo Git instance to answer. It bounds every
+  # call the runner makes, not only the one that asks for a job.
   fetch_timeout: 5s
   # The interval for fetching the job from the Hanzo Git instance.
   fetch_interval: 2s

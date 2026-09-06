@@ -42,18 +42,16 @@ jobs:
       - run: ./deploy --build ${{ needs.job1.outputs.output1 }}
       - run: ./deploy --build ${{ needs.job2.outputs.output2 }}
 `),
-					Needs: map[string]forge.Need{
-						"job1": {
-							Outputs: map[string]string{
-								"output1": "output1 value",
-							},
-							Result: forge.Success,
+					Needs: []forge.Need{
+						{
+							Job:     "job1",
+							Outputs: []forge.Pair{{Name: "output1", Value: "output1 value"}},
+							Result:  forge.Success,
 						},
-						"job2": {
-							Outputs: map[string]string{
-								"output2": "output2 value",
-							},
-							Result: forge.Success,
+						{
+							Job:     "job2",
+							Outputs: []forge.Pair{{Name: "output2", Value: "output2 value"}},
+							Result:  forge.Success,
 						},
 					},
 				},
@@ -79,7 +77,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: echo "hello"
 `),
-					Needs: map[string]forge.Need{},
+					Needs: nil,
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -105,21 +103,14 @@ jobs:
     steps:
       - run: echo "deploying"
 `),
-					Needs: map[string]forge.Need{
-						"build": {
-							Outputs: map[string]string{},
+					Needs: []forge.Need{
+						{Job: "build", Result: forge.Success},
+						{
+							Job:     "test",
+							Outputs: []forge.Pair{{Name: "coverage", Value: "80%"}},
 							Result:  forge.Success,
 						},
-						"test": {
-							Outputs: map[string]string{
-								"coverage": "80%",
-							},
-							Result: forge.Success,
-						},
-						"lint": {
-							Outputs: map[string]string{},
-							Result:  forge.Failure,
-						},
+						{Job: "lint", Result: forge.Failure},
 					},
 				},
 			},
@@ -162,7 +153,7 @@ jobs:
       - run: npm ci
       - run: npm run build
 `),
-					Needs: map[string]forge.Need{},
+					Needs: nil,
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -195,7 +186,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: npm test
 `),
-					Needs: map[string]forge.Need{},
+					Needs: nil,
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -225,7 +216,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: go test ./...
 `),
-					Needs: map[string]forge.Need{},
+					Needs: nil,
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -242,7 +233,7 @@ jobs:
 			args: args{
 				task: &forge.Task{
 					Workflow: []byte("name: \"Special: characters & test\"\non: push\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'echo \"hello: world\"'\n      - run: 'echo \"quotes & ampersands\"'\n      - run: |\n          echo \"multiline\"\n          echo \"script\"\n"),
-					Needs:    map[string]forge.Need{},
+					Needs:    nil,
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -267,7 +258,7 @@ jobs:
     - run: echo "ok"
      bad-indent: true
 `),
-					Needs: map[string]forge.Need{},
+					Needs: nil,
 				},
 			},
 			assert:  nil,

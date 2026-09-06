@@ -30,7 +30,7 @@ type Runner struct {
 	Timeout             time.Duration     `yaml:"timeout"`                // Timeout specifies the duration for runner timeout.
 	ShutdownTimeout     time.Duration     `yaml:"shutdown_timeout"`       // ShutdownTimeout specifies the duration to wait for running jobs to complete during a shutdown of the runner.
 	Insecure            bool              `yaml:"insecure"`               // Insecure indicates whether the runner operates in an insecure mode.
-	FetchTimeout        time.Duration     `yaml:"fetch_timeout"`          // FetchTimeout specifies the timeout duration for fetching resources.
+	FetchTimeout        time.Duration     `yaml:"fetch_timeout"`          // FetchTimeout is how long to wait for the forge to answer. It bounds every call, because a call on the wire cannot be cancelled once it has left.
 	FetchInterval       time.Duration     `yaml:"fetch_interval"`         // FetchInterval specifies the interval duration for fetching resources.
 	FetchIntervalMax    time.Duration     `yaml:"fetch_interval_max"`     // FetchIntervalMax specifies the maximum backoff interval when idle.
 	LogReportInterval   time.Duration     `yaml:"log_report_interval"`    // LogReportInterval specifies the base interval for periodic log flush.

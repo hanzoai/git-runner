@@ -144,43 +144,31 @@ const defaultActionsURLFallback = "https://github.com"
 
 // getDefaultActionsURL resolves where `uses: owner/repo@ref` is fetched from.
 //
-// The value normally arrives in the task context as gitea_default_actions_url.
-// When DEFAULT_ACTIONS_URL is "https://github.com" and github_mirror is set, the
-// mirror wins.
+// The value normally arrives in the task context. When it is "https://github.com"
+// and github_mirror is set, the mirror wins.
 //
-// ⛔ The empty case is the one that matters. The value is absent from the task
-// context — which is what our forge does — and the old code returned that ""
-// unchanged. act then builds every action URL by
-// concatenating it:
+// ⛔ The empty case is the one that matters. act concatenates this value, so an
+// empty one builds "https:///actions/checkout" — three slashes, no host — and
+// the job dies before its first step on `http: no Host in request URL`, unless
+// the action happens to already be in this runner's act cache. Which makes a
+// build's outcome depend on which runner claimed it.
 //
-//	☁  git clone 'https:///actions/checkout' # ref=v4
-//	Unable to clone: Get "https:///actions/checkout/info/refs?service=git-upload-pack":
-//	http: no Host in request URL
-//
-// Three slashes, no host. The job dies before its first step, so a runner can
-// only execute a workflow whose actions are ALREADY in its local act cache.
-// Measured across our fleet on 2026-08-01: four of ten runners held ZERO cached
-// actions while others held 6-20, so whether a build passed depended on which
-// runner claimed it — hanzoai/bot has a success and a failure recorded against
-// the same commit.
-//
-// github_mirror could not rescue this: it is only consulted when the value is
-// EXACTLY "https://github.com", so an empty value fell straight through.
-//
-// Falling back keeps the runner correct no matter what the server sends, which
-// is the right place for this — the runner is what constructs the URL.
+// github_mirror cannot rescue that by itself: it is consulted only when the
+// value is EXACTLY "https://github.com", so an empty one falls straight
+// through. Falling back here keeps the runner correct whatever the forge sends,
+// which is the right place for it — the runner is what builds the URL.
 func (r *Runner) getDefaultActionsURL(task *forge.Task) string {
-	giteaDefaultActionsURL, _ := task.Context["gitea_default_actions_url"].(string)
-	if giteaDefaultActionsURL == "" {
+	declared := task.Context.ActionsURL
+	if declared == "" {
 		if r.cfg.Runner.GithubMirror != "" {
 			return r.cfg.Runner.GithubMirror
 		}
 		return defaultActionsURLFallback
 	}
-	if giteaDefaultActionsURL == defaultActionsURLFallback && r.cfg.Runner.GithubMirror != "" {
+	if declared == defaultActionsURLFallback && r.cfg.Runner.GithubMirror != "" {
 		return r.cfg.Runner.GithubMirror
 	}
-	return giteaDefaultActionsURL
+	return declared
 }
 
 func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Reporter) (err error) {
@@ -190,7 +178,7 @@ func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Rep
 		}
 	}()
 
-	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", r.name, ver.Version(), task.ID, text(task.Context)["job"], text(task.Context)["event_name"])
+	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", r.name, ver.Version(), task.ID, task.Context.Job, task.Context.EventName)
 
 	workflow, jobID, err := generateWorkflow(task)
 	if err != nil {
@@ -204,58 +192,60 @@ func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Rep
 	job := workflow.GetJob(jobID)
 	reporter.ResetSteps(len(job.Steps))
 
-	taskContext := text(task.Context)
-	event, _ := task.Context["event"].(map[string]any)
+	gitCtx := &task.Context
+	secrets := index(task.Secrets)
 
-	log.Infof("task %v repo is %v %v %v", task.ID, taskContext["repository"],
+	// act reads the event as a decoded object and writes it back out as the
+	// event file, so the payload is decoded once here and re-encoded below.
+	var event map[string]any
+	if len(gitCtx.Event) > 0 {
+		if err := json.Unmarshal(gitCtx.Event, &event); err != nil {
+			return fmt.Errorf("task %d: event payload: %w", task.ID, err)
+		}
+	}
+
+	log.Infof("task %v repo is %v %v %v", task.ID, gitCtx.Repository,
 		r.getDefaultActionsURL(task),
 		r.client.Address())
 
 	preset := &model.GithubContext{
 		Event:           event,
-		RunID:           taskContext["run_id"],
-		RunNumber:       taskContext["run_number"],
-		RunAttempt:      taskContext["run_attempt"],
-		Actor:           taskContext["actor"],
-		Repository:      taskContext["repository"],
-		EventName:       taskContext["event_name"],
-		Sha:             taskContext["sha"],
-		Ref:             taskContext["ref"],
-		RefName:         taskContext["ref_name"],
-		RefType:         taskContext["ref_type"],
-		HeadRef:         taskContext["head_ref"],
-		BaseRef:         taskContext["base_ref"],
-		Token:           taskContext["token"],
-		RepositoryOwner: taskContext["repository_owner"],
-		RetentionDays:   taskContext["retention_days"],
+		RunID:           gitCtx.RunID,
+		RunNumber:       gitCtx.RunNumber,
+		RunAttempt:      gitCtx.RunAttempt,
+		Actor:           gitCtx.Actor,
+		Repository:      gitCtx.Repository,
+		EventName:       gitCtx.EventName,
+		Sha:             gitCtx.Sha,
+		Ref:             gitCtx.Ref,
+		RefName:         gitCtx.RefName,
+		RefType:         gitCtx.RefType,
+		HeadRef:         gitCtx.HeadRef,
+		BaseRef:         gitCtx.BaseRef,
+		Token:           gitCtx.Token,
+		RepositoryOwner: gitCtx.RepositoryOwner,
+		RetentionDays:   gitCtx.RetentionDays,
 		// The server declares where its API lives. Dropping it here left
 		// APIURL empty, so act fell back to <instance>/api/v1 and every
 		// octokit-based action 404'd on a server that serves it elsewhere.
-		APIURL: taskContext["api_url"],
+		APIURL: gitCtx.APIURL,
 	}
-	if t := task.Secrets["GIT_TOKEN"]; t != "" {
+	if t := secrets["GIT_TOKEN"]; t != "" {
 		preset.Token = t
-	} else if t := task.Secrets["GITHUB_TOKEN"]; t != "" {
+	} else if t := secrets["GITHUB_TOKEN"]; t != "" {
 		preset.Token = t
 	}
 
-	if actionsIDTokenRequestURL := taskContext["actions_id_token_request_url"]; actionsIDTokenRequestURL != "" {
-		r.envs["ACTIONS_ID_TOKEN_REQUEST_URL"] = actionsIDTokenRequestURL
-		r.envs["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = taskContext["actions_id_token_request_token"]
-		task.Secrets["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = r.envs["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
+	runtimeToken := gitCtx.RuntimeToken
+	if runtimeToken == "" {
+		runtimeToken = preset.Token
 	}
-
-	giteaRuntimeToken := taskContext["gitea_runtime_token"]
-	if giteaRuntimeToken == "" {
-		// use task token to action api token for previous server versions
-		giteaRuntimeToken = preset.Token
-	}
-	r.envs["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
+	r.envs["ACTIONS_RUNTIME_TOKEN"] = runtimeToken
 	// Mask the runtime token so it cannot be echoed in user step output; it is
 	// now also the cache server's bearer credential and leaking it would let
 	// any reader of the log impersonate this job against the cache.
-	if giteaRuntimeToken != "" {
-		task.Secrets["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
+	if runtimeToken != "" {
+		secrets["ACTIONS_RUNTIME_TOKEN"] = runtimeToken
 	}
 
 	// Register this job's runtime token with the local cache server so that
@@ -265,7 +255,7 @@ func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Rep
 	// lifetime. Only applies to the embedded cache server; when the operator
 	// points the runner at an external cache via cfg.Cache.ExternalServer, it
 	// is that server's responsibility to authenticate requests.
-	defer r.registerCacheForTask(giteaRuntimeToken, preset.Repository, reporter)()
+	defer r.registerCacheForTask(runtimeToken, preset.Repository, reporter)()
 
 	eventJSON, err := json.Marshal(preset.Event)
 	if err != nil {
@@ -297,9 +287,9 @@ func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Rep
 		LogOutput:             true,
 		JSONLogger:            false,
 		Env:                   r.envs,
-		Secrets:               task.Secrets,
+		Secrets:               secrets,
 		GitHubInstance:        strings.TrimSuffix(r.client.Address(), "/"),
-		ServerURL:             taskContext["server_url"],
+		ServerURL:             gitCtx.ServerURL,
 		AutoRemove:            true,
 		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,
@@ -312,7 +302,7 @@ func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Rep
 		Privileged:            r.cfg.Container.Privileged,
 		DefaultActionInstance: r.getDefaultActionsURL(task),
 		PlatformPicker:        r.labels.PickPlatform,
-		Vars:                  task.Vars,
+		Vars:                  index(task.Vars),
 		ValidVolumes:          r.cfg.Container.ValidVolumes,
 		InsecureSkipTLS:       r.cfg.Runner.Insecure,
 	}
@@ -433,16 +423,13 @@ func (r *Runner) Declare(ctx context.Context, labels []string) (*forge.DeclareOu
 	})
 }
 
-// text reads the task context as the strings act expects. The context carries
-// whatever JSON the forge put in it, and every field act reads is a string; a
-// value of any other shape, or one the forge did not send, reads as empty here
-// rather than panicking a job that is otherwise fine.
-func text(ctx map[string]any) map[string]string {
-	out := make(map[string]string, len(ctx))
-	for k, v := range ctx {
-		if s, ok := v.(string); ok {
-			out[k] = s
-		}
+// index reads a list of name/value pairs as the map act takes. The wire carries
+// a list because a map cannot cross the plane; act wants lookups, so the
+// conversion happens once, here, at the boundary between the two.
+func index(pairs []forge.Pair) map[string]string {
+	out := make(map[string]string, len(pairs))
+	for _, p := range pairs {
+		out[p.Name] = p.Value
 	}
 	return out
 }

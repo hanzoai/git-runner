@@ -5,7 +5,6 @@ package poll
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand/v2"
 	"sync"
@@ -27,10 +26,10 @@ type TaskRunner interface {
 }
 
 type Poller struct {
-	client       client.Client
-	runner       TaskRunner
-	cfg          *config.Config
-	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the server.
+	client client.Client
+	runner TaskRunner
+	cfg    *config.Config
+	queue  atomic.Int64 // the queue version this runner last saw; see fetchTask.
 
 	pollingCtx      context.Context
 	shutdownPolling context.CancelFunc
@@ -227,24 +226,18 @@ func (p *Poller) runTaskWithRecover(ctx context.Context, task *forge.Task) {
 	}
 }
 
+// fetchTask asks the forge for work once. The forge answers immediately,
+// always: queue is the version the runner last saw, and a forge whose version
+// still matches has queued nothing since and answers without opening the
+// assignment transaction. Cadence is this poller's business — see
+// calculateInterval — and the wait for an answer is the wire's, so a forge that
+// takes too long produces an error here rather than a silence that reads like
+// an idle forge.
 func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*forge.Task, bool) {
-	reqCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.FetchTimeout)
-	defer cancel()
-
 	// Load the version value that was in the cache when the request was sent.
-	v := p.tasksVersion.Load()
+	v := p.queue.Load()
 	start := time.Now()
-	out, err := p.client.Task(reqCtx, &forge.TaskIn{TasksVersion: v})
-
-	// DeadlineExceeded is the designed idle path for a long-poll: the server
-	// found no work within FetchTimeout. Treat it as an empty response and do
-	// not record the duration — the timeout value would swamp the histogram.
-	if errors.Is(err, context.DeadlineExceeded) {
-		s.consecutiveEmpty++
-		s.consecutiveErrors = 0 // timeout is a healthy idle response
-		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
-		return nil, false
-	}
+	out, err := p.client.Task(ctx, &forge.TaskIn{Queue: v})
 	metrics.PollFetchDuration.Observe(time.Since(start).Seconds())
 
 	if err != nil {
@@ -264,8 +257,8 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*forge.Task, bo
 		return nil, false
 	}
 
-	if out.TasksVersion > v {
-		p.tasksVersion.CompareAndSwap(v, out.TasksVersion)
+	if out.Queue > v {
+		p.queue.CompareAndSwap(v, out.Queue)
 	}
 
 	if out.Task == nil {
@@ -274,8 +267,8 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*forge.Task, bo
 		return nil, false
 	}
 
-	// got a task, set `tasksVersion` to zero to force query db in next request.
-	p.tasksVersion.CompareAndSwap(out.TasksVersion, 0)
+	// got a task, so forget the queue version: the next request must look.
+	p.queue.CompareAndSwap(out.Queue, 0)
 
 	metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultTask).Inc()
 	return out.Task, true

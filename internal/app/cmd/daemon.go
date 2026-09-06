@@ -25,6 +25,7 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/metrics"
 	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -126,7 +127,10 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 			log.Infof("labels updated to: %v", reg.Labels)
 		}
 
-		cli := client.New(reg.Address, cfg.Runner.Insecure, reg.UUID, reg.Token)
+		cli, err := client.New(reg.Address, forge.Credential{UUID: reg.UUID, Token: reg.Token}, cfg.Runner.Insecure, cfg.Runner.FetchTimeout)
+		if err != nil {
+			return err
+		}
 
 		runner := run.NewRunner(cfg, reg, cli)
 

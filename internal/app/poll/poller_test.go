@@ -6,6 +6,7 @@ package poll
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -75,6 +76,34 @@ func TestPoller_FetchErrorIncrementsErrorsOnly(t *testing.T) {
 	require.False(t, ok)
 	assert.Equal(t, int64(1), s.consecutiveErrors)
 	assert.Equal(t, int64(0), s.consecutiveEmpty)
+}
+
+// TestPoller_TimeoutIsAnError pins the difference between a forge with nothing
+// to give and a forge that did not answer.
+//
+// ⛔ These were once the same. A deadline was read as "the designed idle path
+// for a long poll" — fiction, the forge has never blocked — so it counted as an
+// empty response AND reset the error counter. A forge answering in six seconds
+// against a five second wait was therefore indistinguishable from an idle one
+// in every log line and every metric, while suppressing the very counter that
+// would have raised an alarm.
+func TestPoller_TimeoutIsAnError(t *testing.T) {
+	client := mocks.NewClient(t)
+	client.On("Task", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.TaskIn) (*forge.TaskOut, error) {
+			return nil, fmt.Errorf("call post_runner_task: %w", context.DeadlineExceeded)
+		},
+	)
+
+	cfg, err := config.LoadDefault("")
+	require.NoError(t, err)
+	p := &Poller{client: client, cfg: cfg}
+
+	s := &workerState{}
+	_, ok := p.fetchTask(context.Background(), s)
+	require.False(t, ok)
+	assert.Equal(t, int64(1), s.consecutiveErrors, "a forge that did not answer is an error")
+	assert.Equal(t, int64(0), s.consecutiveEmpty, "and it is not an idle forge")
 }
 
 // TestPoller_CalculateInterval verifies the exponential backoff math is

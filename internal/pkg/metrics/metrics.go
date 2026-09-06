@@ -29,7 +29,7 @@ const (
 	// LabelOp* name the forge operation a call went to; they are the operation
 	// names themselves, so a metric and a URL cannot drift apart.
 	LabelOpTask  = "task"
-	LabelOpLogs  = "logs"
+	LabelOpLog   = "log"
 	LabelOpState = "state"
 
 	LabelStatusSuccess   = "success"

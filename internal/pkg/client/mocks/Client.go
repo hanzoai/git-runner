@@ -31,7 +31,6 @@ func NewClient(t testing) *Client {
 }
 
 func (m *Client) Address() string { return m.MethodCalled("Address").Get(0).(string) }
-func (m *Client) Insecure() bool  { return m.MethodCalled("Insecure").Get(0).(bool) }
 
 // answer dispatches one operation. A test registers either the reply itself or a
 // function to compute it, which is what lets a test answer differently per call.
@@ -60,6 +59,6 @@ func (m *Client) State(ctx context.Context, in *forge.StateIn) (*forge.StateOut,
 	return answer[forge.StateIn, forge.StateOut](m, "State", ctx, in)
 }
 
-func (m *Client) Logs(ctx context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
-	return answer[forge.LogsIn, forge.LogsOut](m, "Logs", ctx, in)
+func (m *Client) Log(ctx context.Context, in *forge.LogIn) (*forge.LogOut, error) {
+	return answer[forge.LogIn, forge.LogOut](m, "Log", ctx, in)
 }

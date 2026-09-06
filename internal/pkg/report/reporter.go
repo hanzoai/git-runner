@@ -32,7 +32,7 @@ type Reporter struct {
 	clientM sync.Mutex
 
 	logOffset   int
-	logRows     []forge.Row
+	logLines    []forge.Line
 	logReplacer *strings.Replacer
 	oldnew      []string
 
@@ -67,13 +67,17 @@ type Reporter struct {
 
 func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *forge.Task, cfg *config.Config) *Reporter {
 	var oldnew []string
-	for _, key := range []string{"token", "git_runtime_token"} {
-		if v, _ := task.Context[key].(string); v != "" {
+	for _, v := range []string{task.Context.Token, task.Context.RuntimeToken} {
+		if v != "" {
 			oldnew = append(oldnew, v, "***")
 		}
 	}
-	for _, v := range task.Secrets {
-		oldnew = append(oldnew, v, "***")
+	debug := false
+	for _, secret := range task.Secrets {
+		oldnew = append(oldnew, secret.Value, "***")
+		if secret.Name == "ACTIONS_STEP_DEBUG" && secret.Value == "true" {
+			debug = true
+		}
 	}
 
 	rv := &Reporter{
@@ -92,9 +96,7 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 		daemon:              make(chan struct{}),
 	}
 
-	if task.Secrets["ACTIONS_STEP_DEBUG"] == "true" {
-		rv.debugOutputEnabled = true
-	}
+	rv.debugOutputEnabled = debug
 
 	return rv
 }
@@ -167,8 +169,8 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 		log.WithFields(entry.Data).Trace(entry.Message)
 	}
 
-	timestamp := entry.Time
-	if r.state.Started.IsZero() {
+	timestamp := entry.Time.UnixNano()
+	if r.state.Started == 0 {
 		r.state.Started = timestamp
 	}
 
@@ -193,8 +195,8 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 			}
 		}
 		if !r.duringSteps() {
-			if row, ok := r.parseLogRow(entry); ok {
-				r.logRows = append(r.logRows, row)
+			if line, ok := r.parseLine(entry); ok {
+				r.logLines = append(r.logLines, line)
 			}
 		}
 		r.unlockAndNotify(urgentState)
@@ -209,15 +211,15 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 	}
 	if step == nil {
 		if !r.duringSteps() {
-			if row, ok := r.parseLogRow(entry); ok {
-				r.logRows = append(r.logRows, row)
+			if line, ok := r.parseLine(entry); ok {
+				r.logLines = append(r.logLines, line)
 			}
 		}
 		r.unlockAndNotify(false)
 		return nil
 	}
 
-	if step.Started.IsZero() {
+	if step.Started == 0 {
 		step.Started = timestamp
 		urgentState = true
 	}
@@ -229,23 +231,23 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 
 	if v, ok := entry.Data["raw_output"]; ok {
 		if rawOutput, ok := v.(bool); ok && rawOutput {
-			if row, ok := r.parseLogRow(entry); ok {
+			if line, ok := r.parseLine(entry); ok {
 				if step.LogLength == 0 {
-					step.LogIndex = int64(r.logOffset + len(r.logRows))
+					step.LogIndex = int64(r.logOffset + len(r.logLines))
 				}
 				step.LogLength++
-				r.logRows = append(r.logRows, row)
+				r.logLines = append(r.logLines, line)
 			}
 		}
 	} else if !r.duringSteps() {
-		if row, ok := r.parseLogRow(entry); ok {
-			r.logRows = append(r.logRows, row)
+		if line, ok := r.parseLine(entry); ok {
+			r.logLines = append(r.logLines, line)
 		}
 	}
 	if v, ok := entry.Data["stepResult"]; ok && isJobStepEntry(entry) {
 		if stepResult, ok := r.parseResult(v); ok {
 			if step.LogLength == 0 {
-				step.LogIndex = int64(r.logOffset + len(r.logRows))
+				step.LogIndex = int64(r.logOffset + len(r.logLines))
 			}
 			step.Result = stepResult
 			step.Stopped = timestamp
@@ -300,7 +302,7 @@ func (r *Reporter) runDaemonLoop() {
 
 		case <-r.logNotify:
 			r.stateMu.RLock()
-			n := len(r.logRows)
+			n := len(r.logLines)
 			r.stateMu.RUnlock()
 
 			if n >= r.logBatchSize {
@@ -345,8 +347,8 @@ func (r *Reporter) Logf(format string, a ...any) {
 
 func (r *Reporter) logf(format string, a ...any) {
 	if !r.duringSteps() {
-		r.logRows = append(r.logRows, forge.Row{
-			Time:    time.Now(),
+		r.logLines = append(r.logLines, forge.Line{
+			Time:    time.Now().UnixNano(),
 			Content: fmt.Sprintf(format, a...),
 		})
 	}
@@ -385,14 +387,14 @@ func (r *Reporter) Close(lastWords string) error {
 			}
 		}
 		r.state.Result = forge.Failure
-		r.logRows = append(r.logRows, forge.Row{
-			Time:    time.Now(),
+		r.logLines = append(r.logLines, forge.Line{
+			Time:    time.Now().UnixNano(),
 			Content: lastWords,
 		})
-		r.state.Stopped = time.Now()
+		r.state.Stopped = time.Now().UnixNano()
 	} else if lastWords != "" {
-		r.logRows = append(r.logRows, forge.Row{
-			Time:    time.Now(),
+		r.logLines = append(r.logLines, forge.Line{
+			Time:    time.Now().UnixNano(),
 			Content: lastWords,
 		})
 	}
@@ -420,29 +422,29 @@ func (r *Reporter) Close(lastWords string) error {
 	)
 }
 
-func (r *Reporter) ReportLog(noMore bool) error {
+func (r *Reporter) ReportLog(last bool) error {
 	r.clientM.Lock()
 	defer r.clientM.Unlock()
 
 	r.stateMu.RLock()
-	rows := r.logRows
+	lines := r.logLines
 	r.stateMu.RUnlock()
 
-	if !noMore && len(rows) == 0 {
+	if !last && len(lines) == 0 {
 		return nil
 	}
 
 	start := time.Now()
-	out, err := r.client.Logs(r.ctx, &forge.LogsIn{
-		TaskID: r.state.ID,
-		Index:  int64(r.logOffset),
-		Rows:   rows,
-		NoMore: noMore,
+	out, err := r.client.Log(r.ctx, &forge.LogIn{
+		Task:  r.state.ID,
+		Index: int64(r.logOffset),
+		Lines: lines,
+		Last:  last,
 	})
 	metrics.ReportLogDuration.Observe(time.Since(start).Seconds())
 	if err != nil {
 		metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultError).Inc()
-		metrics.ClientErrors.WithLabelValues(metrics.LabelOpLogs).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelOpLog).Inc()
 		return err
 	}
 	metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
@@ -453,17 +455,17 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	}
 
 	r.stateMu.Lock()
-	r.logRows = r.logRows[ack-r.logOffset:]
-	submitted := r.logOffset + len(rows)
+	r.logLines = r.logLines[ack-r.logOffset:]
+	submitted := r.logOffset + len(lines)
 	r.logOffset = ack
-	remaining := len(r.logRows)
+	remaining := len(r.logLines)
 	r.stateMu.Unlock()
 	if remaining != r.lastLogBufferRows {
 		metrics.ReportLogBufferRows.Set(float64(remaining))
 		r.lastLogBufferRows = remaining
 	}
 
-	if noMore && ack < submitted {
+	if last && ack < submitted {
 		return errors.New("not all logs are submitted")
 	}
 
@@ -476,11 +478,12 @@ func (r *Reporter) ReportState(reportResult bool) error {
 	r.clientM.Lock()
 	defer r.clientM.Unlock()
 
-	// Build the outputs map first (single Range pass instead of two).
-	outputs := make(map[string]string)
+	// The outputs still to send, gathered once. A key whose value is no longer a
+	// string is one the forge has already stored.
+	var outputs []forge.Pair
 	r.outputs.Range(func(k, v any) bool {
 		if val, ok := v.(string); ok {
-			outputs[k.(string)] = val
+			outputs = append(outputs, forge.Pair{Name: k.(string), Value: val})
 		}
 		return true
 	})
@@ -524,7 +527,7 @@ func (r *Reporter) ReportState(reportResult bool) error {
 	metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
 	r.lastReportedAtNanos.Store(time.Now().UnixNano())
 
-	for _, k := range out.SentOutputs {
+	for _, k := range out.Stored {
 		r.outputs.Store(k, struct{}{})
 	}
 
@@ -619,10 +622,10 @@ func (r *Reporter) handleCommand(originalContent, command, value string) *string
 	return &originalContent
 }
 
-// parseLogRow renders one log entry as a row to send. It reports false for an
+// parseLine renders one log entry as a line to send. It reports false for an
 // entry that carried a workflow command and no output of its own: there is
-// nothing to show, and a zero Row would print a blank line.
-func (r *Reporter) parseLogRow(entry *log.Entry) (forge.Row, bool) {
+// nothing to show, and a zero Line would print a blank line.
+func (r *Reporter) parseLine(entry *log.Entry) (forge.Line, bool) {
 	content := strings.TrimRightFunc(entry.Message, func(r rune) bool { return r == '\r' || r == '\n' })
 
 	matches := cmdRegex.FindStringSubmatch(content)
@@ -630,14 +633,14 @@ func (r *Reporter) parseLogRow(entry *log.Entry) (forge.Row, bool) {
 		if output := r.handleCommand(content, matches[1], matches[3]); output != nil {
 			content = *output
 		} else {
-			return forge.Row{}, false
+			return forge.Line{}, false
 		}
 	}
 
 	content = r.logReplacer.Replace(content)
 
-	return forge.Row{
-		Time:    entry.Time,
+	return forge.Line{
+		Time:    entry.Time.UnixNano(),
 		Content: strings.ToValidUTF8(content, "?"),
 	}, true
 }
