@@ -14,8 +14,7 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/client/mocks"
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	connect_go "connectrpc.com/connect"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,10 +25,10 @@ import (
 // fetchTask increments only the relevant counter.
 func TestPoller_WorkerStateCounters(t *testing.T) {
 	client := mocks.NewClient(t)
-	client.On("FetchTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.FetchTaskRequest]) (*connect_go.Response[runnerv1.FetchTaskResponse], error) {
-			// Always return an empty response.
-			return connect_go.NewResponse(&runnerv1.FetchTaskResponse{}), nil
+	client.On("Task", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.TaskIn) (*forge.TaskOut, error) {
+			// Always answer with no work.
+			return &forge.TaskOut{}, nil
 		},
 	)
 
@@ -61,8 +60,8 @@ func TestPoller_WorkerStateCounters(t *testing.T) {
 // increments only the per-worker error counter, not the empty counter.
 func TestPoller_FetchErrorIncrementsErrorsOnly(t *testing.T) {
 	client := mocks.NewClient(t)
-	client.On("FetchTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.FetchTaskRequest]) (*connect_go.Response[runnerv1.FetchTaskResponse], error) {
+	client.On("Task", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.TaskIn) (*forge.TaskOut, error) {
 			return nil, errors.New("network unreachable")
 		},
 	)
@@ -125,7 +124,7 @@ type mockRunner struct {
 	totalCompleted atomic.Int64
 }
 
-func (m *mockRunner) Run(ctx context.Context, _ *runnerv1.Task) error {
+func (m *mockRunner) Run(ctx context.Context, _ *forge.Task) error {
 	atomicMax(&m.maxConcurrent, m.running.Add(1))
 	select {
 	case <-time.After(m.delay):
@@ -153,18 +152,16 @@ func TestPoller_ConcurrencyLimitedByCapacity(t *testing.T) {
 	)
 
 	cli := mocks.NewClient(t)
-	cli.On("FetchTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.FetchTaskRequest]) (*connect_go.Response[runnerv1.FetchTaskResponse], error) {
+	cli.On("Task", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.TaskIn) (*forge.TaskOut, error) {
 			atomicMax(&maxFetchConcur, fetchConcur.Add(1))
 			defer fetchConcur.Add(-1)
 
 			n := tasksReturned.Add(1)
 			if n <= totalTasks {
-				return connect_go.NewResponse(&runnerv1.FetchTaskResponse{
-					Task: &runnerv1.Task{Id: n},
-				}), nil
+				return &forge.TaskOut{Task: &forge.Task{ID: n}}, nil
 			}
-			return connect_go.NewResponse(&runnerv1.FetchTaskResponse{}), nil
+			return &forge.TaskOut{}, nil
 		},
 	)
 
@@ -196,7 +193,7 @@ func TestPoller_ConcurrencyLimitedByCapacity(t *testing.T) {
 	assert.GreaterOrEqual(t, runner.maxConcurrent.Load(), int64(2),
 		"with 6 tasks and capacity 3, at least 2 should overlap")
 	assert.Equal(t, int64(1), maxFetchConcur.Load(),
-		"FetchTask must never be called concurrently (single poller)")
+		"the task operation must never be called concurrently (single poller)")
 	assert.Equal(t, int64(totalTasks), runner.totalCompleted.Load(),
 		"all tasks should have been executed")
 }
@@ -211,14 +208,12 @@ func TestPoller_ConcurrencyLimitedByCapacity(t *testing.T) {
 func TestPoller_ShutdownForcesJobsOnTimeout(t *testing.T) {
 	var served atomic.Bool
 	cli := mocks.NewClient(t)
-	cli.On("FetchTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.FetchTaskRequest]) (*connect_go.Response[runnerv1.FetchTaskResponse], error) {
+	cli.On("Task", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.TaskIn) (*forge.TaskOut, error) {
 			if served.CompareAndSwap(false, true) {
-				return connect_go.NewResponse(&runnerv1.FetchTaskResponse{
-					Task: &runnerv1.Task{Id: 1},
-				}), nil
+				return &forge.TaskOut{Task: &forge.Task{ID: 1}}, nil
 			}
-			return connect_go.NewResponse(&runnerv1.FetchTaskResponse{}), nil
+			return &forge.TaskOut{}, nil
 		},
 	)
 

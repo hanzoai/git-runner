@@ -6,9 +6,8 @@ package run
 import (
 	"testing"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 )
@@ -16,15 +15,13 @@ import (
 // taskWithActionsURL builds a task whose context carries the given
 // gitea_default_actions_url. Passing present=false omits the field entirely,
 // which is what a server that does not send it produces.
-func taskWithActionsURL(t *testing.T, url string, present bool) *runnerv1.Task {
+func taskWithActionsURL(t *testing.T, url string, present bool) *forge.Task {
 	t.Helper()
-	fields := map[string]interface{}{}
+	fields := map[string]any{}
 	if present {
 		fields["gitea_default_actions_url"] = url
 	}
-	ctx, err := structpb.NewStruct(fields)
-	assert.NoError(t, err)
-	return &runnerv1.Task{Context: ctx}
+	return &forge.Task{Context: fields}
 }
 
 func TestGetDefaultActionsURL(t *testing.T) {

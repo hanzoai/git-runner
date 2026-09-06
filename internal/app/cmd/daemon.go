@@ -25,7 +25,6 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/metrics"
 	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
-	"connectrpc.com/connect"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -127,32 +126,22 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 			log.Infof("labels updated to: %v", reg.Labels)
 		}
 
-		cli := client.New(
-			reg.Address,
-			cfg.Runner.Insecure,
-			reg.UUID,
-			reg.Token,
-			ver.Version(),
-		)
+		cli := client.New(reg.Address, cfg.Runner.Insecure, reg.UUID, reg.Token)
 
 		runner := run.NewRunner(cfg, reg, cli)
 
 		// declare the labels of the runner before fetching tasks
-		resp, err := runner.Declare(ctx, ls.Names())
-		if err != nil && connect.CodeOf(err) == connect.CodeUnimplemented {
-			log.Errorf("Your server version is too old to support runner declare, please upgrade to v1.21 or later")
-			return err
-		} else if err != nil {
+		declared, err := runner.Declare(ctx, ls.Names())
+		if err != nil {
 			log.WithError(err).Error("fail to invoke Declare")
 			return err
-		} else {
-			log.Infof("runner: %s, with version: %s, with labels: %v, declare successfully",
-				resp.Msg.Runner.Name, resp.Msg.Runner.Version, resp.Msg.Runner.Labels)
 		}
+		log.Infof("runner: %s, with version: %s, with labels: %v, declare successfully",
+			declared.Runner.Name, declared.Runner.Version, declared.Runner.Labels)
 
 		if cfg.Metrics.Enabled {
 			metrics.Init()
-			metrics.RunnerInfo.WithLabelValues(ver.Version(), resp.Msg.Runner.Name).Set(1)
+			metrics.RunnerInfo.WithLabelValues(ver.Version(), declared.Runner.Name).Set(1)
 			metrics.RunnerCapacity.Set(float64(cfg.Runner.Capacity))
 			metrics.RegisterUptimeFunc(time.Now())
 			metrics.RegisterRunningJobsFunc(runner.RunningCount, cfg.Runner.Capacity)
@@ -179,14 +168,14 @@ func runDaemon(ctx context.Context, daemArgs *daemonArgs, configFile *string) fu
 			<-ctx.Done()
 		}
 
-		log.Infof("runner: %s shutdown initiated, waiting %s for running jobs to complete before shutting down", resp.Msg.Runner.Name, cfg.Runner.ShutdownTimeout)
+		log.Infof("runner: %s shutdown initiated, waiting %s for running jobs to complete before shutting down", declared.Runner.Name, cfg.Runner.ShutdownTimeout)
 
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Runner.ShutdownTimeout)
 		defer cancel()
 
 		err = poller.Shutdown(ctx)
 		if err != nil {
-			log.Warnf("runner: %s cancelled in progress jobs during shutdown", resp.Msg.Runner.Name)
+			log.Warnf("runner: %s cancelled in progress jobs during shutdown", declared.Runner.Name)
 		}
 
 		return nil

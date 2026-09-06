@@ -16,15 +16,14 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 	"github.com/hanzoai/git-runner/internal/pkg/metrics"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"connectrpc.com/connect"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	log "github.com/sirupsen/logrus"
 )
 
 // TaskRunner abstracts task execution so the poller can be tested
 // without a real runner.
 type TaskRunner interface {
-	Run(ctx context.Context, task *runnerv1.Task) error
+	Run(ctx context.Context, task *forge.Task) error
 }
 
 type Poller struct {
@@ -105,7 +104,7 @@ func (p *Poller) Poll() {
 		s.resetBackoff()
 
 		wg.Add(1)
-		go func(t *runnerv1.Task) {
+		go func(t *forge.Task) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			p.runTaskWithRecover(p.jobsCtx, t)
@@ -215,7 +214,7 @@ func addJitter(d time.Duration) time.Duration {
 	return d + time.Duration(jitter)
 }
 
-func (p *Poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
+func (p *Poller) runTaskWithRecover(ctx context.Context, task *forge.Task) {
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -228,16 +227,14 @@ func (p *Poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
 	}
 }
 
-func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*runnerv1.Task, bool) {
+func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*forge.Task, bool) {
 	reqCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.FetchTimeout)
 	defer cancel()
 
 	// Load the version value that was in the cache when the request was sent.
 	v := p.tasksVersion.Load()
 	start := time.Now()
-	resp, err := p.client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{
-		TasksVersion: v,
-	}))
+	out, err := p.client.Task(reqCtx, &forge.TaskIn{TasksVersion: v})
 
 	// DeadlineExceeded is the designed idle path for a long-poll: the server
 	// found no work within FetchTimeout. Treat it as an empty response and do
@@ -254,32 +251,32 @@ func (p *Poller) fetchTask(ctx context.Context, s *workerState) (*runnerv1.Task,
 		log.WithError(err).Error("failed to fetch task")
 		s.consecutiveErrors++
 		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultError).Inc()
-		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodFetchTask).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelOpTask).Inc()
 		return nil, false
 	}
 
 	// Successful response — reset error counter.
 	s.consecutiveErrors = 0
 
-	if resp == nil || resp.Msg == nil {
+	if out == nil {
 		s.consecutiveEmpty++
 		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
 		return nil, false
 	}
 
-	if resp.Msg.TasksVersion > v {
-		p.tasksVersion.CompareAndSwap(v, resp.Msg.TasksVersion)
+	if out.TasksVersion > v {
+		p.tasksVersion.CompareAndSwap(v, out.TasksVersion)
 	}
 
-	if resp.Msg.Task == nil {
+	if out.Task == nil {
 		s.consecutiveEmpty++
 		metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultEmpty).Inc()
 		return nil, false
 	}
 
 	// got a task, set `tasksVersion` to zero to force query db in next request.
-	p.tasksVersion.CompareAndSwap(resp.Msg.TasksVersion, 0)
+	p.tasksVersion.CompareAndSwap(out.TasksVersion, 0)
 
 	metrics.PollFetchTotal.WithLabelValues(metrics.LabelResultTask).Inc()
-	return resp.Msg.Task, true
+	return out.Task, true
 }

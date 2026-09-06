@@ -8,7 +8,7 @@ import (
 
 	"github.com/hanzoai/git-runner/act/model"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v4"
 	"gotest.tools/v3/assert"
@@ -16,7 +16,7 @@ import (
 
 func Test_generateWorkflow(t *testing.T) {
 	type args struct {
-		task *runnerv1.Task
+		task *forge.Task
 	}
 	tests := []struct {
 		name    string
@@ -28,8 +28,8 @@ func Test_generateWorkflow(t *testing.T) {
 		{
 			name: "has needs",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Build and deploy
 on: push
 
@@ -42,18 +42,18 @@ jobs:
       - run: ./deploy --build ${{ needs.job1.outputs.output1 }}
       - run: ./deploy --build ${{ needs.job2.outputs.output2 }}
 `),
-					Needs: map[string]*runnerv1.TaskNeed{
+					Needs: map[string]forge.Need{
 						"job1": {
 							Outputs: map[string]string{
 								"output1": "output1 value",
 							},
-							Result: runnerv1.Result_RESULT_SUCCESS,
+							Result: forge.Success,
 						},
 						"job2": {
 							Outputs: map[string]string{
 								"output2": "output2 value",
 							},
-							Result: runnerv1.Result_RESULT_SUCCESS,
+							Result: forge.Success,
 						},
 					},
 				},
@@ -67,8 +67,8 @@ jobs:
 		{
 			name: "no needs",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Simple workflow
 on: push
 
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: echo "hello"
 `),
-					Needs: map[string]*runnerv1.TaskNeed{},
+					Needs: map[string]forge.Need{},
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -93,8 +93,8 @@ jobs:
 		{
 			name: "needs list",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Workflow with list needs
 on: push
 
@@ -105,20 +105,20 @@ jobs:
     steps:
       - run: echo "deploying"
 `),
-					Needs: map[string]*runnerv1.TaskNeed{
+					Needs: map[string]forge.Need{
 						"build": {
 							Outputs: map[string]string{},
-							Result:  runnerv1.Result_RESULT_SUCCESS,
+							Result:  forge.Success,
 						},
 						"test": {
 							Outputs: map[string]string{
 								"coverage": "80%",
 							},
-							Result: runnerv1.Result_RESULT_SUCCESS,
+							Result: forge.Success,
 						},
 						"lint": {
 							Outputs: map[string]string{},
-							Result:  runnerv1.Result_RESULT_FAILURE,
+							Result:  forge.Failure,
 						},
 					},
 				},
@@ -136,8 +136,8 @@ jobs:
 		{
 			name: "workflow env and defaults",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Complex workflow
 on:
   push:
@@ -162,7 +162,7 @@ jobs:
       - run: npm ci
       - run: npm run build
 `),
-					Needs: map[string]*runnerv1.TaskNeed{},
+					Needs: map[string]forge.Need{},
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -178,8 +178,8 @@ jobs:
 		{
 			name: "job with container and services",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Integration tests
 on: push
 
@@ -195,7 +195,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: npm test
 `),
-					Needs: map[string]*runnerv1.TaskNeed{},
+					Needs: map[string]forge.Need{},
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -210,8 +210,8 @@ jobs:
 		{
 			name: "job with matrix strategy",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Matrix build
 on: push
 
@@ -225,7 +225,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: go test ./...
 `),
-					Needs: map[string]*runnerv1.TaskNeed{},
+					Needs: map[string]forge.Need{},
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -240,9 +240,9 @@ jobs:
 		{
 			name: "special yaml characters in values",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte("name: \"Special: characters & test\"\non: push\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'echo \"hello: world\"'\n      - run: 'echo \"quotes & ampersands\"'\n      - run: |\n          echo \"multiline\"\n          echo \"script\"\n"),
-					Needs:           map[string]*runnerv1.TaskNeed{},
+				task: &forge.Task{
+					Workflow: []byte("name: \"Special: characters & test\"\non: push\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'echo \"hello: world\"'\n      - run: 'echo \"quotes & ampersands\"'\n      - run: |\n          echo \"multiline\"\n          echo \"script\"\n"),
+					Needs:    map[string]forge.Need{},
 				},
 			},
 			assert: func(t *testing.T, wf *model.Workflow) {
@@ -256,8 +256,8 @@ jobs:
 		{
 			name: "invalid yaml",
 			args: args{
-				task: &runnerv1.Task{
-					WorkflowPayload: []byte(`
+				task: &forge.Task{
+					Workflow: []byte(`
 name: Bad workflow
 on: push
 jobs:
@@ -267,7 +267,7 @@ jobs:
     - run: echo "ok"
      bad-indent: true
 `),
-					Needs: map[string]*runnerv1.TaskNeed{},
+					Needs: map[string]forge.Need{},
 				},
 			},
 			assert:  nil,

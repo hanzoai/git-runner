@@ -28,9 +28,8 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/report"
 	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"connectrpc.com/connect"
 	"github.com/docker/docker/api/types/container"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,10 +79,16 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 		}
 	}
 
-	// set artifact gitea api
-	artifactAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
-	envs["ACTIONS_RUNTIME_URL"] = artifactAPI
-	envs["ACTIONS_RESULTS_URL"] = strings.TrimSuffix(cli.Address(), "/")
+	// Where a job's artifact steps upload to. actions/upload-artifact@v3 and its
+	// download counterpart concatenate "_apis/pipelines/…" onto ACTIONS_RUNTIME_URL,
+	// so the trailing slash is part of the contract.
+	//
+	// ACTIONS_RESULTS_URL is the v4 protocol's, and only its origin survives:
+	// @actions/artifact v2 reduces the value to a scheme and host and appends its
+	// own "twirp/…" path, so there is nothing to place here.
+	forgeURL := strings.TrimSuffix(cli.Address(), "/")
+	envs["ACTIONS_RUNTIME_URL"] = forgeURL + "/v1/artifact/"
+	envs["ACTIONS_RESULTS_URL"] = forgeURL
 
 	// Set specific environments to distinguish between Hanzo Git and GitHub
 	envs["GIT_ACTIONS"] = "true"
@@ -99,12 +104,12 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 	}
 }
 
-func (r *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
-	if _, ok := r.runningTasks.Load(task.Id); ok {
-		return fmt.Errorf("task %d is already running", task.Id)
+func (r *Runner) Run(ctx context.Context, task *forge.Task) error {
+	if _, ok := r.runningTasks.Load(task.ID); ok {
+		return fmt.Errorf("task %d is already running", task.ID)
 	}
-	r.runningTasks.Store(task.Id, struct{}{})
-	defer r.runningTasks.Delete(task.Id)
+	r.runningTasks.Store(task.ID, struct{}{})
+	defer r.runningTasks.Delete(task.ID)
 
 	r.runningCount.Add(1)
 
@@ -143,9 +148,9 @@ const defaultActionsURLFallback = "https://github.com"
 // When DEFAULT_ACTIONS_URL is "https://github.com" and github_mirror is set, the
 // mirror wins.
 //
-// ⛔ The empty case is the one that matters. GetStringValue() returns "" when the
-// field is absent from the task context — which is what our forge does — and the
-// old code returned that "" unchanged. act then builds every action URL by
+// ⛔ The empty case is the one that matters. The value is absent from the task
+// context — which is what our forge does — and the old code returned that ""
+// unchanged. act then builds every action URL by
 // concatenating it:
 //
 //	☁  git clone 'https:///actions/checkout' # ref=v4
@@ -164,8 +169,8 @@ const defaultActionsURLFallback = "https://github.com"
 //
 // Falling back keeps the runner correct no matter what the server sends, which
 // is the right place for this — the runner is what constructs the URL.
-func (r *Runner) getDefaultActionsURL(task *runnerv1.Task) string {
-	giteaDefaultActionsURL := task.Context.Fields["gitea_default_actions_url"].GetStringValue()
+func (r *Runner) getDefaultActionsURL(task *forge.Task) string {
+	giteaDefaultActionsURL, _ := task.Context["gitea_default_actions_url"].(string)
 	if giteaDefaultActionsURL == "" {
 		if r.cfg.Runner.GithubMirror != "" {
 			return r.cfg.Runner.GithubMirror
@@ -178,14 +183,14 @@ func (r *Runner) getDefaultActionsURL(task *runnerv1.Task) string {
 	return giteaDefaultActionsURL
 }
 
-func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.Reporter) (err error) {
+func (r *Runner) run(ctx context.Context, task *forge.Task, reporter *report.Reporter) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
 
-	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", r.name, ver.Version(), task.Id, task.Context.Fields["job"].GetStringValue(), task.Context.Fields["event_name"].GetStringValue())
+	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", r.name, ver.Version(), task.ID, text(task.Context)["job"], text(task.Context)["event_name"])
 
 	workflow, jobID, err := generateWorkflow(task)
 	if err != nil {
@@ -199,33 +204,34 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 	job := workflow.GetJob(jobID)
 	reporter.ResetSteps(len(job.Steps))
 
-	taskContext := task.Context.Fields
+	taskContext := text(task.Context)
+	event, _ := task.Context["event"].(map[string]any)
 
-	log.Infof("task %v repo is %v %v %v", task.Id, taskContext["repository"].GetStringValue(),
+	log.Infof("task %v repo is %v %v %v", task.ID, taskContext["repository"],
 		r.getDefaultActionsURL(task),
 		r.client.Address())
 
 	preset := &model.GithubContext{
-		Event:           taskContext["event"].GetStructValue().AsMap(),
-		RunID:           taskContext["run_id"].GetStringValue(),
-		RunNumber:       taskContext["run_number"].GetStringValue(),
-		RunAttempt:      taskContext["run_attempt"].GetStringValue(),
-		Actor:           taskContext["actor"].GetStringValue(),
-		Repository:      taskContext["repository"].GetStringValue(),
-		EventName:       taskContext["event_name"].GetStringValue(),
-		Sha:             taskContext["sha"].GetStringValue(),
-		Ref:             taskContext["ref"].GetStringValue(),
-		RefName:         taskContext["ref_name"].GetStringValue(),
-		RefType:         taskContext["ref_type"].GetStringValue(),
-		HeadRef:         taskContext["head_ref"].GetStringValue(),
-		BaseRef:         taskContext["base_ref"].GetStringValue(),
-		Token:           taskContext["token"].GetStringValue(),
-		RepositoryOwner: taskContext["repository_owner"].GetStringValue(),
-		RetentionDays:   taskContext["retention_days"].GetStringValue(),
+		Event:           event,
+		RunID:           taskContext["run_id"],
+		RunNumber:       taskContext["run_number"],
+		RunAttempt:      taskContext["run_attempt"],
+		Actor:           taskContext["actor"],
+		Repository:      taskContext["repository"],
+		EventName:       taskContext["event_name"],
+		Sha:             taskContext["sha"],
+		Ref:             taskContext["ref"],
+		RefName:         taskContext["ref_name"],
+		RefType:         taskContext["ref_type"],
+		HeadRef:         taskContext["head_ref"],
+		BaseRef:         taskContext["base_ref"],
+		Token:           taskContext["token"],
+		RepositoryOwner: taskContext["repository_owner"],
+		RetentionDays:   taskContext["retention_days"],
 		// The server declares where its API lives. Dropping it here left
 		// APIURL empty, so act fell back to <instance>/api/v1 and every
 		// octokit-based action 404'd on a server that serves it elsewhere.
-		APIURL: taskContext["api_url"].GetStringValue(),
+		APIURL: taskContext["api_url"],
 	}
 	if t := task.Secrets["GIT_TOKEN"]; t != "" {
 		preset.Token = t
@@ -233,13 +239,13 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		preset.Token = t
 	}
 
-	if actionsIDTokenRequestURL := taskContext["actions_id_token_request_url"].GetStringValue(); actionsIDTokenRequestURL != "" {
+	if actionsIDTokenRequestURL := taskContext["actions_id_token_request_url"]; actionsIDTokenRequestURL != "" {
 		r.envs["ACTIONS_ID_TOKEN_REQUEST_URL"] = actionsIDTokenRequestURL
-		r.envs["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = taskContext["actions_id_token_request_token"].GetStringValue()
+		r.envs["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = taskContext["actions_id_token_request_token"]
 		task.Secrets["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = r.envs["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
 	}
 
-	giteaRuntimeToken := taskContext["gitea_runtime_token"].GetStringValue()
+	giteaRuntimeToken := taskContext["gitea_runtime_token"]
 	if giteaRuntimeToken == "" {
 		// use task token to action api token for previous server versions
 		giteaRuntimeToken = preset.Token
@@ -274,7 +280,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 	workdirParent := strings.TrimLeft(r.cfg.Container.WorkdirParent, "/")
 	if r.cfg.Container.BindWorkdir {
 		// Append the task ID to isolate concurrent jobs from the same repo.
-		workdirParent = fmt.Sprintf("%s/%d", workdirParent, task.Id)
+		workdirParent = fmt.Sprintf("%s/%d", workdirParent, task.ID)
 	}
 	workdir := filepath.FromSlash(fmt.Sprintf("/%s/%s", workdirParent, preset.Repository))
 
@@ -293,12 +299,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		Env:                   r.envs,
 		Secrets:               task.Secrets,
 		GitHubInstance:        strings.TrimSuffix(r.client.Address(), "/"),
-		ServerURL:             taskContext["server_url"].GetStringValue(),
+		ServerURL:             taskContext["server_url"],
 		AutoRemove:            true,
 		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
-		ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%d", task.Id),
+		ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%d", task.ID),
 		ContainerMaxLifetime:  maxLifetime,
 		ContainerNetworkMode:  container.NetworkMode(r.cfg.Container.Network),
 		ContainerOptions:      r.cfg.Container.Options,
@@ -420,9 +426,23 @@ func (r *Runner) RunningCount() int64 {
 	return r.runningCount.Load()
 }
 
-func (r *Runner) Declare(ctx context.Context, labels []string) (*connect.Response[runnerv1.DeclareResponse], error) {
-	return r.client.Declare(ctx, connect.NewRequest(&runnerv1.DeclareRequest{
+func (r *Runner) Declare(ctx context.Context, labels []string) (*forge.DeclareOut, error) {
+	return r.client.Declare(ctx, &forge.DeclareIn{
 		Version: ver.Version(),
 		Labels:  labels,
-	}))
+	})
+}
+
+// text reads the task context as the strings act expects. The context carries
+// whatever JSON the forge put in it, and every field act reads is a string; a
+// value of any other shape, or one the forge did not send, reads as empty here
+// rather than panicking a job that is otherwise fine.
+func text(ctx map[string]any) map[string]string {
+	out := make(map[string]string, len(ctx))
+	for k, v := range ctx {
+		if s, ok := v.(string); ok {
+			out[k] = s
+		}
+	}
+	return out
 }

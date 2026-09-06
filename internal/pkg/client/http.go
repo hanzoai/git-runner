@@ -1,85 +1,138 @@
+// Copyright 2026 Hanzo AI, Inc. All rights reserved.
 // Copyright 2022 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
 package client
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
-	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
-	"connectrpc.com/connect"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 )
 
-func getHTTPClient(endpoint string, insecure bool) *http.Client {
+// Conn is a live handle to one forge. Operations are POSTs under /v1/runner:
+// the address is the operation and the body is the whole input.
+type Conn struct {
+	endpoint string
+	base     string
+	insecure bool
+	uuid     string
+	token    string
+	http     *http.Client
+}
+
+var _ Client = (*Conn)(nil)
+
+// New returns a client for the forge at endpoint. uuid and token are the
+// credential a registered runner presents; both are empty while registering.
+func New(endpoint string, insecure bool, uuid, token string) *Conn {
 	transport := &http.Transport{
-		MaxIdleConns:        10,
-		MaxIdleConnsPerHost: 10, // All requests go to one host; default is 2 which causes frequent reconnects.
+		MaxIdleConns: 10,
+		// Every operation goes to one host, and the default of 2 causes frequent
+		// reconnects while a job streams its log.
+		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
 	}
-	if strings.HasPrefix(endpoint, "https://") && insecure {
-		transport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
+	if insecure && strings.HasPrefix(endpoint, "https://") {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	return &http.Client{Transport: transport}
-}
-
-// New returns a new runner client.
-func New(endpoint string, insecure bool, uuid, token, version string, opts ...connect.ClientOption) *HTTPClient {
-	baseURL := strings.TrimRight(endpoint, "/") + "/api/actions"
-
-	opts = append(opts, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			if uuid != "" {
-				req.Header().Set(UUIDHeader, uuid)
-			}
-			if token != "" {
-				req.Header().Set(TokenHeader, token)
-			}
-			// TODO: version will be removed from request header after server 1.20 released.
-			if version != "" {
-				req.Header().Set(VersionHeader, version)
-			}
-			return next(ctx, req)
-		}
-	})))
-
-	httpClient := getHTTPClient(endpoint, insecure)
-	return &HTTPClient{
-		PingServiceClient: pingv1connect.NewPingServiceClient(
-			httpClient,
-			baseURL,
-			opts...,
-		),
-		RunnerServiceClient: runnerv1connect.NewRunnerServiceClient(
-			httpClient,
-			baseURL,
-			opts...,
-		),
+	return &Conn{
 		endpoint: endpoint,
+		base:     strings.TrimRight(endpoint, "/") + "/v1/runner/",
 		insecure: insecure,
+		uuid:     uuid,
+		token:    token,
+		http:     &http.Client{Transport: transport},
 	}
 }
 
-func (c *HTTPClient) Address() string {
-	return c.endpoint
+func (c *Conn) Address() string { return c.endpoint }
+func (c *Conn) Insecure() bool  { return c.insecure }
+
+// Fault is what the forge answers when an operation fails: the status it chose,
+// a short code, and a message. It is an error, so a caller that only wants to
+// log it can, and one that needs to branch reads Status or Code.
+type Fault struct {
+	Status int    `json:"status"`
+	Code   string `json:"code,omitempty"`
+	Msg    string `json:"error"`
 }
 
-func (c *HTTPClient) Insecure() bool {
-	return c.insecure
+func (e *Fault) Error() string { return fmt.Sprintf("%s (%d)", e.Msg, e.Status) }
+
+// call performs one operation and decodes the reply. It is a function rather
+// than a method because Go methods cannot take type parameters; the methods
+// below are one line each on top of it.
+func call[In, Out any](ctx context.Context, c *Conn, opName string, in *In) (*Out, error) {
+	body, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("encode %s: %w", opName, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+opName, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.uuid != "" {
+		req.Header.Set(UUIDHeader, c.uuid)
+		req.Header.Set(TokenHeader, c.token)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call %s: %w", opName, err)
+	}
+	defer resp.Body.Close()
+
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read %s reply: %w", opName, err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		fault := &Fault{}
+		if json.Unmarshal(payload, fault) != nil || fault.Msg == "" {
+			return nil, &Fault{Status: resp.StatusCode, Msg: strings.TrimSpace(string(payload))}
+		}
+		if fault.Status == 0 {
+			fault.Status = resp.StatusCode
+		}
+		return nil, fault
+	}
+
+	out := new(Out)
+	if len(payload) == 0 {
+		return out, nil
+	}
+	if err := json.Unmarshal(payload, out); err != nil {
+		return nil, fmt.Errorf("decode %s reply: %w", opName, err)
+	}
+	return out, nil
 }
 
-var _ Client = (*HTTPClient)(nil)
+func (c *Conn) Register(ctx context.Context, in *forge.RegisterIn) (*forge.RegisterOut, error) {
+	return call[forge.RegisterIn, forge.RegisterOut](ctx, c, "register", in)
+}
 
-// An HTTPClient manages communication with the runner API.
-type HTTPClient struct {
-	pingv1connect.PingServiceClient
-	runnerv1connect.RunnerServiceClient
-	endpoint string
-	insecure bool
+func (c *Conn) Declare(ctx context.Context, in *forge.DeclareIn) (*forge.DeclareOut, error) {
+	return call[forge.DeclareIn, forge.DeclareOut](ctx, c, "declare", in)
+}
+
+func (c *Conn) Task(ctx context.Context, in *forge.TaskIn) (*forge.TaskOut, error) {
+	return call[forge.TaskIn, forge.TaskOut](ctx, c, "task", in)
+}
+
+func (c *Conn) State(ctx context.Context, in *forge.StateIn) (*forge.StateOut, error) {
+	return call[forge.StateIn, forge.StateOut](ctx, c, "state", in)
+}
+
+func (c *Conn) Logs(ctx context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+	return call[forge.LogsIn, forge.LogsOut](ctx, c, "logs", in)
 }

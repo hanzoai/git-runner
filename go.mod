@@ -3,8 +3,6 @@ module github.com/hanzoai/git-runner
 go 1.26.0
 
 require (
-	code.gitea.io/actions-proto-go v0.4.1
-	connectrpc.com/connect v1.19.2
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/docker/docker v25.0.15+incompatible
 	github.com/joho/godotenv v1.5.1
@@ -15,7 +13,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/term v0.40.0
 	golang.org/x/time v0.14.0 // indirect
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.2
 )
@@ -29,6 +27,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.8.0
 	github.com/go-git/go-git/v5 v5.18.0
 	github.com/gobwas/glob v0.2.3
+	github.com/hanzoai/git/modules/actions/runner v0.0.0-20260906194805-b2642e49f5e1
 	github.com/imdario/mergo v0.3.16
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51

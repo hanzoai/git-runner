@@ -7,16 +7,15 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/hanzoai/git-runner/act/model"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"go.yaml.in/yaml/v4"
 )
 
-func generateWorkflow(task *runnerv1.Task) (*model.Workflow, string, error) {
-	workflow, err := model.ReadWorkflow(bytes.NewReader(task.WorkflowPayload))
+func generateWorkflow(task *forge.Task) (*model.Workflow, string, error) {
+	workflow, err := model.ReadWorkflow(bytes.NewReader(task.Workflow))
 	if err != nil {
 		return nil, "", err
 	}
@@ -32,7 +31,7 @@ func generateWorkflow(task *runnerv1.Task) (*model.Workflow, string, error) {
 		needJobIDs = append(needJobIDs, id)
 		needJob := &model.Job{
 			Outputs: need.Outputs,
-			Result:  strings.ToLower(strings.TrimPrefix(need.Result.String(), "RESULT_")),
+			Result:  string(need.Result),
 		}
 		workflow.Jobs[id] = needJob
 	}

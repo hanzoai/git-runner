@@ -15,14 +15,11 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/client/mocks"
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	connect_go "connectrpc.com/connect"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestReporter_parseLogRow(t *testing.T) {
@@ -148,10 +145,10 @@ func TestReporter_parseLogRow(t *testing.T) {
 				debugOutputEnabled: tt.debugOutputEnabled,
 			}
 			for idx, arg := range tt.args {
-				rv := r.parseLogRow(&log.Entry{Message: arg})
+				rv, ok := r.parseLogRow(&log.Entry{Message: arg})
 				got := "<nil>"
 
-				if rv != nil {
+				if ok {
 					got = rv.Content
 				}
 
@@ -164,23 +161,17 @@ func TestReporter_parseLogRow(t *testing.T) {
 func TestReporter_Fire(t *testing.T) {
 	t.Run("ignore command lines", func(t *testing.T) {
 		client := mocks.NewClient(t)
-		client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
-			t.Logf("Received UpdateLog: %s", req.Msg.String())
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+		client.On("Logs", mock.Anything, mock.Anything).Return(func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+			t.Logf("Received logs: index %d, %d rows", in.Index, len(in.Rows))
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		})
-		client.On("UpdateTask", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
-			t.Logf("Received UpdateTask: %s", req.Msg.String())
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+		client.On("State", mock.Anything, mock.Anything).Return(func(_ context.Context, in *forge.StateIn) (*forge.StateOut, error) {
+			t.Logf("Received state: task %d, result %q", in.State.ID, in.State.Result)
+			return &forge.StateOut{}, nil
 		})
 		ctx, cancel := context.WithCancel(context.Background())
-		taskCtx, err := structpb.NewStruct(map[string]any{})
-		require.NoError(t, err)
 		cfg, _ := config.LoadDefault("")
-		reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
-			Context: taskCtx,
-		}, cfg)
+		reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 		reporter.RunDaemon()
 		defer func() {
 			require.NoError(t, reporter.Close(""))
@@ -206,14 +197,14 @@ func TestReporter_Fire(t *testing.T) {
 			"raw_output": true,
 			"stepResult": "failure",
 		}}))
-		assert.Equal(t, runnerv1.Result_RESULT_UNSPECIFIED, reporter.state.Steps[0].Result)
+		assert.Equal(t, forge.Pending, reporter.state.Steps[0].Result)
 		require.NoError(t, reporter.Fire(&log.Entry{Message: "step result", Data: map[string]any{
 			"stage":      "Main",
 			"stepNumber": 0,
 			"raw_output": true,
 			"stepResult": "success",
 		}}))
-		assert.Equal(t, runnerv1.Result_RESULT_SUCCESS, reporter.state.Steps[0].Result)
+		assert.Equal(t, forge.Success, reporter.state.Steps[0].Result)
 
 		assert.Equal(t, int64(5), reporter.state.Steps[0].LogLength)
 	})
@@ -231,32 +222,28 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 	runnerDeleted := false
 
 	client := mocks.NewClient(t)
-	client.On("UpdateLog", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+	client.On("Logs", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
 			if runnerDeleted {
 				return nil, errors.New("runner has been deleted")
 			}
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		},
 	)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Maybe().Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
+		func(_ context.Context, in *forge.StateIn) (*forge.StateOut, error) {
 			// Server deletes ephemeral runner when it receives a completed state
-			if req.Msg.State != nil && req.Msg.State.Result != runnerv1.Result_RESULT_UNSPECIFIED {
+			if in.State.Result != forge.Pending {
 				runnerDeleted = true
 			}
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 
 	// Fire a log entry to create pending data
@@ -272,17 +259,17 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 	// In the real race, this happens while RunDaemon is between ReportLog and ReportState.
 	reporter.stateMu.Lock()
 	reporter.closed = true
-	for _, v := range reporter.state.Steps {
-		if v.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-			v.Result = runnerv1.Result_RESULT_CANCELLED
+	for i := range reporter.state.Steps {
+		if reporter.state.Steps[i].Result == forge.Pending {
+			reporter.state.Steps[i].Result = forge.Cancelled
 		}
 	}
-	reporter.state.Result = runnerv1.Result_RESULT_FAILURE
-	reporter.logRows = append(reporter.logRows, &runnerv1.LogRow{
-		Time:    timestamppb.Now(),
+	reporter.state.Result = forge.Failure
+	reporter.logRows = append(reporter.logRows, forge.Row{
+		Time:    time.Now(),
 		Content: "Early termination",
 	})
-	reporter.state.StoppedAt = timestamppb.Now()
+	reporter.state.Stopped = time.Now()
 	reporter.stateMu.Unlock()
 
 	// Step 3: RunDaemon's ReportState() — with the fix, this returns early
@@ -295,7 +282,7 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 	require.NoError(t, reporter.ReportLog(false))
 	// Acknowledge Close as done in daemon
 	close(reporter.daemon)
-	err = reporter.ReportLog(true)
+	err := reporter.ReportLog(true)
 	require.NoError(t, err, "final log upload must not fail: runner should not be deleted before Close finishes sending logs")
 	err = reporter.ReportState(true)
 	require.NoError(t, err, "final state update should work: runner should not be deleted before Close finishes sending logs")
@@ -303,26 +290,20 @@ func TestReporter_EphemeralRunnerDeletion(t *testing.T) {
 
 func TestReporter_RunDaemonClose_Race(t *testing.T) {
 	client := mocks.NewClient(t)
-	client.On("UpdateLog", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+	client.On("Logs", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		},
 	)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+	client.On("State", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.StateIn) (*forge.StateOut, error) {
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
-		Context: taskCtx,
-	}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 
 	// Start the daemon loop — RunDaemon spawns a goroutine internally.
@@ -344,24 +325,20 @@ func TestReporter_MaxLatencyTimer(t *testing.T) {
 	var updateLogCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("UpdateLog", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+	client.On("Logs", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
 			updateLogCalls.Add(1)
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		},
 	)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Maybe().Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 
 	// Custom config: logTicker=10s (won't fire during test), maxLatency=100ms
 	cfg, _ := config.LoadDefault("")
@@ -369,7 +346,7 @@ func TestReporter_MaxLatencyTimer(t *testing.T) {
 	cfg.Runner.LogReportMaxLatency = 100 * time.Millisecond
 	cfg.Runner.LogReportBatchSize = 1000 // won't trigger batch flush
 
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -395,24 +372,20 @@ func TestReporter_BatchSizeFlush(t *testing.T) {
 	var updateLogCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("UpdateLog", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+	client.On("Logs", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
 			updateLogCalls.Add(1)
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		},
 	)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Maybe().Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+	client.On("State", mock.Anything, mock.Anything).Maybe().Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 
 	// Custom config: large timers, small batch size
 	cfg, _ := config.LoadDefault("")
@@ -420,7 +393,7 @@ func TestReporter_BatchSizeFlush(t *testing.T) {
 	cfg.Runner.LogReportMaxLatency = 10 * time.Second
 	cfg.Runner.LogReportBatchSize = 5
 
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -450,24 +423,22 @@ func TestReporter_StateChangedNotLostDuringReport(t *testing.T) {
 	release := make(chan struct{})
 
 	client := mocks.NewClient(t)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+	client.On("State", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
 			n := updateTaskCalls.Add(1)
 			if n == 1 {
 				// Signal that the first UpdateTask is in flight, then block until released.
 				close(inFlight)
 				<-release
 			}
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(2)
 
 	// Mark stateChanged=true so the first ReportState proceeds to UpdateTask.
@@ -513,22 +484,20 @@ func TestReporter_StateChangedRestoredOnError(t *testing.T) {
 	var updateTaskCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+	client.On("State", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
 			n := updateTaskCalls.Add(1)
 			if n == 1 {
 				return nil, errors.New("transient network error")
 			}
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 	cfg, _ := config.LoadDefault("")
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 
 	reporter.stateMu.Lock()
@@ -554,31 +523,27 @@ func TestReporter_StateNotifyFlush(t *testing.T) {
 	var updateTaskCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("UpdateLog", mock.Anything, mock.Anything).Maybe().Return(
-		func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
-			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
-				AckIndex: req.Msg.Index + int64(len(req.Msg.Rows)),
-			}), nil
+	client.On("Logs", mock.Anything, mock.Anything).Maybe().Return(
+		func(_ context.Context, in *forge.LogsIn) (*forge.LogsOut, error) {
+			return &forge.LogsOut{Ack: in.Index + int64(len(in.Rows))}, nil
 		},
 	)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+	client.On("State", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
 			updateTaskCalls.Add(1)
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 
 	// Custom config: large state interval so only stateNotify can trigger
 	cfg, _ := config.LoadDefault("")
 	cfg.Runner.StateReportInterval = 10 * time.Second
 	cfg.Runner.LogReportInterval = 10 * time.Second
 
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 	reporter.RunDaemon()
 	defer func() {
@@ -607,20 +572,18 @@ func TestReporter_StateHeartbeat(t *testing.T) {
 	var updateTaskCalls atomic.Int64
 
 	client := mocks.NewClient(t)
-	client.On("UpdateTask", mock.Anything, mock.Anything).Return(
-		func(_ context.Context, _ *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+	client.On("State", mock.Anything, mock.Anything).Return(
+		func(_ context.Context, _ *forge.StateIn) (*forge.StateOut, error) {
 			updateTaskCalls.Add(1)
-			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			return &forge.StateOut{}, nil
 		},
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	taskCtx, err := structpb.NewStruct(map[string]any{})
-	require.NoError(t, err)
 	cfg, _ := config.LoadDefault("")
 	cfg.Runner.StateReportInterval = 50 * time.Millisecond
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{Context: taskCtx}, cfg)
+	reporter := NewReporter(ctx, cancel, client, &forge.Task{Context: map[string]any{}}, cfg)
 	reporter.ResetSteps(1)
 
 	// First call has no prior report — sends to seed lastReportedAt.

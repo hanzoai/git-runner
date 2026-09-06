@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
@@ -18,7 +18,7 @@ const Namespace = "git-runner"
 // Label value constants for Prometheus metrics.
 // Using constants prevents typos from silently creating new time-series.
 //
-// LabelResult* values are used on metrics with label key "result" (RPC outcomes).
+// LabelResult* values are used on metrics with label key "result" (call outcomes).
 // LabelStatus* values are used on metrics with label key "status" (job outcomes).
 const (
 	LabelResultTask    = "task"
@@ -26,9 +26,11 @@ const (
 	LabelResultError   = "error"
 	LabelResultSuccess = "success"
 
-	LabelMethodFetchTask  = "FetchTask"
-	LabelMethodUpdateLog  = "UpdateLog"
-	LabelMethodUpdateTask = "UpdateTask"
+	// LabelOp* name the forge operation a call went to; they are the operation
+	// names themselves, so a metric and a URL cannot drift apart.
+	LabelOpTask  = "task"
+	LabelOpLogs  = "logs"
+	LabelOpState = "state"
 
 	LabelStatusSuccess   = "success"
 	LabelStatusFailure   = "failure"
@@ -37,20 +39,20 @@ const (
 	LabelStatusUnknown   = "unknown"
 )
 
-// rpcDurationBuckets covers the expected latency range for short-running
-// UpdateLog / UpdateTask RPCs. FetchTask uses its own buckets (it has a 10s tail).
-var rpcDurationBuckets = []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5}
+// callDurationBuckets covers the expected latency range for the short logs and
+// state calls. The task call has its own buckets: it long-polls and has a 10s tail.
+var callDurationBuckets = []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5}
 
-// ResultToStatusLabel maps a runnerv1.Result to the "status" label value used on job metrics.
-func ResultToStatusLabel(r runnerv1.Result) string {
+// ResultToStatusLabel maps a forge.Result to the "status" label value used on job metrics.
+func ResultToStatusLabel(r forge.Result) string {
 	switch r {
-	case runnerv1.Result_RESULT_SUCCESS:
+	case forge.Success:
 		return LabelStatusSuccess
-	case runnerv1.Result_RESULT_FAILURE:
+	case forge.Failure:
 		return LabelStatusFailure
-	case runnerv1.Result_RESULT_CANCELLED:
+	case forge.Cancelled:
 		return LabelStatusCancelled
-	case runnerv1.Result_RESULT_SKIPPED:
+	case forge.Skipped:
 		return LabelStatusSkipped
 	default:
 		return LabelStatusUnknown
@@ -74,14 +76,14 @@ var (
 		Namespace: Namespace,
 		Subsystem: "poll",
 		Name:      "fetch_total",
-		Help:      "Total number of FetchTask RPCs by result (task, empty, error).",
+		Help:      "Total number of task calls by result (task, empty, error).",
 	}, []string{"result"})
 
 	PollFetchDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: Namespace,
 		Subsystem: "poll",
 		Name:      "fetch_duration_seconds",
-		Help:      "Latency of FetchTask RPCs, excluding expected long-poll timeouts.",
+		Help:      "Latency of task calls, excluding expected long-poll timeouts.",
 		Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10},
 	})
 
@@ -111,30 +113,30 @@ var (
 		Namespace: Namespace,
 		Subsystem: "report",
 		Name:      "log_total",
-		Help:      "Total UpdateLog RPCs by result (success, error).",
+		Help:      "Total logs calls by result (success, error).",
 	}, []string{"result"})
 
 	ReportLogDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: Namespace,
 		Subsystem: "report",
 		Name:      "log_duration_seconds",
-		Help:      "Latency of UpdateLog RPCs.",
-		Buckets:   rpcDurationBuckets,
+		Help:      "Latency of logs calls.",
+		Buckets:   callDurationBuckets,
 	})
 
 	ReportStateTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: "report",
 		Name:      "state_total",
-		Help:      "Total UpdateTask (state) RPCs by result (success, error).",
+		Help:      "Total state calls by result (success, error).",
 	}, []string{"result"})
 
 	ReportStateDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: Namespace,
 		Subsystem: "report",
 		Name:      "state_duration_seconds",
-		Help:      "Latency of UpdateTask RPCs.",
-		Buckets:   rpcDurationBuckets,
+		Help:      "Latency of state calls.",
+		Buckets:   callDurationBuckets,
 	})
 
 	ReportLogBufferRows = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -148,8 +150,8 @@ var (
 		Namespace: Namespace,
 		Subsystem: "client",
 		Name:      "errors_total",
-		Help:      "Total client RPC errors by method.",
-	}, []string{"method"})
+		Help:      "Total failed calls to the forge, by operation.",
+	}, []string{"op"})
 )
 
 // Registry is the custom Prometheus registry used by the runner.

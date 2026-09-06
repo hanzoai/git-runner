@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,12 +18,9 @@ import (
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 	"github.com/hanzoai/git-runner/internal/pkg/metrics"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"connectrpc.com/connect"
 	"github.com/avast/retry-go/v4"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Reporter struct {
@@ -34,7 +32,7 @@ type Reporter struct {
 	clientM sync.Mutex
 
 	logOffset   int
-	logRows     []*runnerv1.LogRow
+	logRows     []forge.Row
 	logReplacer *strings.Replacer
 	oldnew      []string
 
@@ -43,7 +41,7 @@ type Reporter struct {
 	// so the gauge skips no-op Set calls when the buffer size is unchanged.
 	lastLogBufferRows int
 
-	state        *runnerv1.TaskState
+	state        *forge.State
 	stateChanged bool
 	stateMu      sync.RWMutex
 	outputs      sync.Map
@@ -67,13 +65,12 @@ type Reporter struct {
 	stopCommandEndToken string
 }
 
-func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *runnerv1.Task, cfg *config.Config) *Reporter {
+func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *forge.Task, cfg *config.Config) *Reporter {
 	var oldnew []string
-	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
-		oldnew = append(oldnew, v, "***")
-	}
-	if v := task.Context.Fields["gitea_runtime_token"].GetStringValue(); v != "" {
-		oldnew = append(oldnew, v, "***")
+	for _, key := range []string{"token", "git_runtime_token"} {
+		if v, _ := task.Context[key].(string); v != "" {
+			oldnew = append(oldnew, v, "***")
+		}
 	}
 	for _, v := range task.Secrets {
 		oldnew = append(oldnew, v, "***")
@@ -91,10 +88,8 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 		stateReportInterval: cfg.Runner.StateReportInterval,
 		logNotify:           make(chan struct{}, 1),
 		stateNotify:         make(chan struct{}, 1),
-		state: &runnerv1.TaskState{
-			Id: task.Id,
-		},
-		daemon: make(chan struct{}),
+		state:               &forge.State{ID: task.ID},
+		daemon:              make(chan struct{}),
 	}
 
 	if task.Secrets["ACTIONS_STEP_DEBUG"] == "true" {
@@ -105,7 +100,7 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 }
 
 // Result returns the final job result. Safe to call after Close() returns.
-func (r *Reporter) Result() runnerv1.Result {
+func (r *Reporter) Result() forge.Result {
 	r.stateMu.RLock()
 	defer r.stateMu.RUnlock()
 	return r.state.Result
@@ -115,21 +110,12 @@ func (r *Reporter) ResetSteps(l int) {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
 	for i := range l {
-		r.state.Steps = append(r.state.Steps, &runnerv1.StepState{
-			Id: int64(i),
-		})
+		r.state.Steps = append(r.state.Steps, forge.Step{ID: int64(i)})
 	}
 }
 
 func (r *Reporter) Levels() []log.Level {
 	return log.AllLevels
-}
-
-func appendIfNotNil[T any](s []*T, v *T) []*T {
-	if v != nil {
-		return append(s, v)
-	}
-	return s
 }
 
 // isJobStepEntry is used to not report composite step results incorrectly as step result
@@ -182,8 +168,8 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 	}
 
 	timestamp := entry.Time
-	if r.state.StartedAt == nil {
-		r.state.StartedAt = timestamppb.New(timestamp)
+	if r.state.Started.IsZero() {
+		r.state.Started = timestamp
 	}
 
 	stage := entry.Data["stage"]
@@ -193,41 +179,46 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 			if jobResult, ok := r.parseResult(v); ok {
 				// We need to ensure log upload before this upload
 				r.state.Result = jobResult
-				r.state.StoppedAt = timestamppb.New(timestamp)
-				for _, s := range r.state.Steps {
-					if s.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-						s.Result = runnerv1.Result_RESULT_CANCELLED
-						if jobResult == runnerv1.Result_RESULT_SKIPPED {
-							s.Result = runnerv1.Result_RESULT_SKIPPED
-						}
+				r.state.Stopped = timestamp
+				for i := range r.state.Steps {
+					if r.state.Steps[i].Result != forge.Pending {
+						continue
+					}
+					r.state.Steps[i].Result = forge.Cancelled
+					if jobResult == forge.Skipped {
+						r.state.Steps[i].Result = forge.Skipped
 					}
 				}
 				urgentState = true
 			}
 		}
 		if !r.duringSteps() {
-			r.logRows = appendIfNotNil(r.logRows, r.parseLogRow(entry))
+			if row, ok := r.parseLogRow(entry); ok {
+				r.logRows = append(r.logRows, row)
+			}
 		}
 		r.unlockAndNotify(urgentState)
 		return nil
 	}
 
-	var step *runnerv1.StepState
+	var step *forge.Step
 	if v, ok := entry.Data["stepNumber"]; ok {
 		if v, ok := v.(int); ok && len(r.state.Steps) > v {
-			step = r.state.Steps[v]
+			step = &r.state.Steps[v]
 		}
 	}
 	if step == nil {
 		if !r.duringSteps() {
-			r.logRows = appendIfNotNil(r.logRows, r.parseLogRow(entry))
+			if row, ok := r.parseLogRow(entry); ok {
+				r.logRows = append(r.logRows, row)
+			}
 		}
 		r.unlockAndNotify(false)
 		return nil
 	}
 
-	if step.StartedAt == nil {
-		step.StartedAt = timestamppb.New(timestamp)
+	if step.Started.IsZero() {
+		step.Started = timestamp
 		urgentState = true
 	}
 
@@ -238,7 +229,7 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 
 	if v, ok := entry.Data["raw_output"]; ok {
 		if rawOutput, ok := v.(bool); ok && rawOutput {
-			if row := r.parseLogRow(entry); row != nil {
+			if row, ok := r.parseLogRow(entry); ok {
 				if step.LogLength == 0 {
 					step.LogIndex = int64(r.logOffset + len(r.logRows))
 				}
@@ -247,7 +238,9 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 			}
 		}
 	} else if !r.duringSteps() {
-		r.logRows = appendIfNotNil(r.logRows, r.parseLogRow(entry))
+		if row, ok := r.parseLogRow(entry); ok {
+			r.logRows = append(r.logRows, row)
+		}
 	}
 	if v, ok := entry.Data["stepResult"]; ok && isJobStepEntry(entry) {
 		if stepResult, ok := r.parseResult(v); ok {
@@ -255,7 +248,7 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 				step.LogIndex = int64(r.logOffset + len(r.logRows))
 			}
 			step.Result = stepResult
-			step.StoppedAt = timestamppb.New(timestamp)
+			step.Stopped = timestamp
 			urgentState = true
 		}
 	}
@@ -352,8 +345,8 @@ func (r *Reporter) Logf(format string, a ...any) {
 
 func (r *Reporter) logf(format string, a ...any) {
 	if !r.duringSteps() {
-		r.logRows = append(r.logRows, &runnerv1.LogRow{
-			Time:    timestamppb.Now(),
+		r.logRows = append(r.logRows, forge.Row{
+			Time:    time.Now(),
 			Content: fmt.Sprintf(format, a...),
 		})
 	}
@@ -382,24 +375,24 @@ func (r *Reporter) SetOutputs(outputs map[string]string) {
 func (r *Reporter) Close(lastWords string) error {
 	r.stateMu.Lock()
 	r.closed = true
-	if r.state.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+	if r.state.Result == forge.Pending {
 		if lastWords == "" {
 			lastWords = "Early termination"
 		}
-		for _, v := range r.state.Steps {
-			if v.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-				v.Result = runnerv1.Result_RESULT_CANCELLED
+		for i := range r.state.Steps {
+			if r.state.Steps[i].Result == forge.Pending {
+				r.state.Steps[i].Result = forge.Cancelled
 			}
 		}
-		r.state.Result = runnerv1.Result_RESULT_FAILURE
-		r.logRows = append(r.logRows, &runnerv1.LogRow{
-			Time:    timestamppb.Now(),
+		r.state.Result = forge.Failure
+		r.logRows = append(r.logRows, forge.Row{
+			Time:    time.Now(),
 			Content: lastWords,
 		})
-		r.state.StoppedAt = timestamppb.Now()
+		r.state.Stopped = time.Now()
 	} else if lastWords != "" {
-		r.logRows = append(r.logRows, &runnerv1.LogRow{
-			Time:    timestamppb.Now(),
+		r.logRows = append(r.logRows, forge.Row{
+			Time:    time.Now(),
 			Content: lastWords,
 		})
 	}
@@ -440,21 +433,21 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	}
 
 	start := time.Now()
-	resp, err := r.client.UpdateLog(r.ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
-		TaskId: r.state.Id,
+	out, err := r.client.Logs(r.ctx, &forge.LogsIn{
+		TaskID: r.state.ID,
 		Index:  int64(r.logOffset),
 		Rows:   rows,
 		NoMore: noMore,
-	}))
+	})
 	metrics.ReportLogDuration.Observe(time.Since(start).Seconds())
 	if err != nil {
 		metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultError).Inc()
-		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodUpdateLog).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelOpLogs).Inc()
 		return err
 	}
 	metrics.ReportLogTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
 
-	ack := int(resp.Msg.AckIndex)
+	ack := int(out.Ack)
 	if ack < r.logOffset {
 		return errors.New("submitted logs are lost")
 	}
@@ -503,23 +496,26 @@ func (r *Reporter) ReportState(reportResult bool) error {
 		r.stateMu.Unlock()
 		return nil
 	}
-	state := proto.Clone(r.state).(*runnerv1.TaskState)
+	// A copy, so the steps this report describes cannot change under it while the
+	// call is in flight. Step holds no references, so cloning the slice is deep.
+	state := *r.state
+	state.Steps = slices.Clone(r.state.Steps)
 	r.stateChanged = false
 	r.stateMu.Unlock()
 
 	if !reportResult {
-		state.Result = runnerv1.Result_RESULT_UNSPECIFIED
+		state.Result = forge.Pending
 	}
 
 	start := time.Now()
-	resp, err := r.client.UpdateTask(r.ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+	out, err := r.client.State(r.ctx, &forge.StateIn{
 		State:   state,
 		Outputs: outputs,
-	}))
+	})
 	metrics.ReportStateDuration.Observe(time.Since(start).Seconds())
 	if err != nil {
 		metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultError).Inc()
-		metrics.ClientErrors.WithLabelValues(metrics.LabelMethodUpdateTask).Inc()
+		metrics.ClientErrors.WithLabelValues(metrics.LabelOpState).Inc()
 		r.stateMu.Lock()
 		r.stateChanged = true
 		r.stateMu.Unlock()
@@ -528,11 +524,11 @@ func (r *Reporter) ReportState(reportResult bool) error {
 	metrics.ReportStateTotal.WithLabelValues(metrics.LabelResultSuccess).Inc()
 	r.lastReportedAtNanos.Store(time.Now().UnixNano())
 
-	for _, k := range resp.Msg.SentOutputs {
+	for _, k := range out.SentOutputs {
 		r.outputs.Store(k, struct{}{})
 	}
 
-	if resp.Msg.State != nil && resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
+	if out.State.Result == forge.Cancelled {
 		r.cancel()
 	}
 
@@ -553,22 +549,22 @@ func (r *Reporter) ReportState(reportResult bool) error {
 func (r *Reporter) duringSteps() bool {
 	if steps := r.state.Steps; len(steps) == 0 {
 		return false
-	} else if first := steps[0]; first.Result == runnerv1.Result_RESULT_UNSPECIFIED && first.LogLength == 0 {
+	} else if first := steps[0]; first.Result == forge.Pending && first.LogLength == 0 {
 		return false
-	} else if last := steps[len(steps)-1]; last.Result != runnerv1.Result_RESULT_UNSPECIFIED {
+	} else if last := steps[len(steps)-1]; last.Result != forge.Pending {
 		return false
 	}
 	return true
 }
 
-var stringToResult = map[string]runnerv1.Result{
-	"success":   runnerv1.Result_RESULT_SUCCESS,
-	"failure":   runnerv1.Result_RESULT_FAILURE,
-	"skipped":   runnerv1.Result_RESULT_SKIPPED,
-	"cancelled": runnerv1.Result_RESULT_CANCELLED,
+var stringToResult = map[string]forge.Result{
+	"success":   forge.Success,
+	"failure":   forge.Failure,
+	"skipped":   forge.Skipped,
+	"cancelled": forge.Cancelled,
 }
 
-func (r *Reporter) parseResult(result any) (runnerv1.Result, bool) {
+func (r *Reporter) parseResult(result any) (forge.Result, bool) {
 	str := ""
 	if v, ok := result.(string); ok { // for jobResult
 		str = v
@@ -623,7 +619,10 @@ func (r *Reporter) handleCommand(originalContent, command, value string) *string
 	return &originalContent
 }
 
-func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
+// parseLogRow renders one log entry as a row to send. It reports false for an
+// entry that carried a workflow command and no output of its own: there is
+// nothing to show, and a zero Row would print a blank line.
+func (r *Reporter) parseLogRow(entry *log.Entry) (forge.Row, bool) {
 	content := strings.TrimRightFunc(entry.Message, func(r rune) bool { return r == '\r' || r == '\n' })
 
 	matches := cmdRegex.FindStringSubmatch(content)
@@ -631,16 +630,16 @@ func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
 		if output := r.handleCommand(content, matches[1], matches[3]); output != nil {
 			content = *output
 		} else {
-			return nil
+			return forge.Row{}, false
 		}
 	}
 
 	content = r.logReplacer.Replace(content)
 
-	return &runnerv1.LogRow{
-		Time:    timestamppb.New(entry.Time),
+	return forge.Row{
+		Time:    entry.Time,
 		Content: strings.ToValidUTF8(content, "?"),
-	}
+	}, true
 }
 
 func (r *Reporter) addMask(msg string) {

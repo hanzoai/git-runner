@@ -12,16 +12,13 @@ import (
 	"os/signal"
 	goruntime "runtime"
 	"strings"
-	"time"
 
 	"github.com/hanzoai/git-runner/internal/pkg/client"
 	"github.com/hanzoai/git-runner/internal/pkg/config"
 	"github.com/hanzoai/git-runner/internal/pkg/labels"
 	"github.com/hanzoai/git-runner/internal/pkg/ver"
 
-	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"connectrpc.com/connect"
+	forge "github.com/hanzoai/git/modules/actions/runner"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -320,36 +317,7 @@ func registerNoInteractive(ctx context.Context, configFile string, regArgs *regi
 
 func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs) error {
 	// initial http client
-	cli := client.New(
-		inputs.InstanceAddr,
-		cfg.Runner.Insecure,
-		"",
-		"",
-		ver.Version(),
-	)
-
-	for {
-		_, err := cli.Ping(ctx, connect.NewRequest(&pingv1.PingRequest{
-			Data: inputs.RunnerName,
-		}))
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		if ctx.Err() != nil {
-			break
-		}
-		if err != nil {
-			log.WithError(err).
-				Errorln("Cannot ping the Hanzo Git instance server")
-			// TODO: if ping failed, retry or exit
-			time.Sleep(time.Second)
-		} else {
-			log.Debugln("Successfully pinged the Hanzo Git instance server")
-			break
-		}
-	}
+	cli := client.New(inputs.InstanceAddr, cfg.Runner.Insecure, "", "")
 
 	reg := &config.Registration{
 		Name:      inputs.RunnerName,
@@ -365,25 +333,26 @@ func doRegister(ctx context.Context, cfg *config.Config, inputs *registerInputs)
 		ls[i] = l.Name
 	}
 	// register new runner.
-	resp, err := cli.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
-		Name:        reg.Name,
-		Token:       reg.Token,
-		Version:     ver.Version(),
-		AgentLabels: ls, // Could be removed after server 1.20
-		Labels:      ls,
-		Ephemeral:   reg.Ephemeral,
-	}))
+	// Registering is also the reachability check: nothing else has to prove the
+	// forge is there first.
+	out, err := cli.Register(ctx, &forge.RegisterIn{
+		Name:      reg.Name,
+		Token:     reg.Token,
+		Version:   ver.Version(),
+		Labels:    ls,
+		Ephemeral: reg.Ephemeral,
+	})
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")
 		return err
 	}
 
-	reg.ID = resp.Msg.Runner.Id
-	reg.UUID = resp.Msg.Runner.Uuid
-	reg.Name = resp.Msg.Runner.Name
-	reg.Token = resp.Msg.Runner.Token
+	reg.ID = out.Runner.ID
+	reg.UUID = out.Runner.UUID
+	reg.Name = out.Runner.Name
+	reg.Token = out.Runner.Token
 
-	if inputs.Ephemeral != resp.Msg.Runner.Ephemeral {
+	if inputs.Ephemeral != out.Runner.Ephemeral {
 		// TODO we cannot remove the configuration via runner api, if we return an error here we just fill the database
 		log.Error("poller: cannot register new runner as ephemeral upgrade Hanzo Git to gain security, run-once will be used automatically")
 	}
