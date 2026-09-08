@@ -11,3 +11,9 @@ coverage.txt
 __debug_bin
 # gorelease binary folder
 dist
+node_modules/
+.next/
+.turbo/
+coverage/
+__pycache__/
+.venv/
