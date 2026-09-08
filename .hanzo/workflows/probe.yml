@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 jobs:
   probe:
-    runs-on: [hanzo-build-linux-amd64]
+    runs-on: [linux-amd64]
     timeout-minutes: 10
     steps:
       - name: Report the github env and whether the job token can read the API
@@ -41,7 +41,7 @@ jobs:
   # anonymous fetch, so the first line succeeding is itself the proof it was
   # authenticated, and the third party succeeding proves anonymous still works.
   uses:
-    runs-on: [hanzo-build-linux-amd64]
+    runs-on: [linux-amd64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
