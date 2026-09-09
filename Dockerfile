@@ -1,7 +1,7 @@
 ### BUILDER STAGE
 #
 #
-FROM golang:1.26.5-alpine AS builder
+FROM golang:1.26.8-alpine AS builder
 # go.mod pins the toolchain. The golang base image sets GOTOOLCHAIN=local,
 # which turns a `go` directive newer than the image into a hard build
 # failure instead of a download.
