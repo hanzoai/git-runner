@@ -134,4 +134,4 @@ send it, and the two protocols place that differently:
 - Never force-push, amend, or squash unless asked. Use new commits and normal
   push for pull request updates.
 - Include authorship attribution in issue and pull request comments.
-- Add `Co-Authored-By` lines to all commits, indicating name and model used.
+- Commit attribution is set by the git hook; don't add co-author trailers.
