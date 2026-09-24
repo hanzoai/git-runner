@@ -112,7 +112,14 @@ send it, and the two protocols place that differently:
 
 ## Working here
 
-- `make fmt`, `make lint-go`, `make tidy` after any `go.mod` change.
+- `make help` lists the development targets.
+- `make fmt` formats `.go` files, `make lint-go` lints them, `make tidy` after
+  any `go.mod` change.
+- One test: `go test -run '^TestName$' ./modulepath/`.
+- A new `.go` file carries the current year in its copyright header.
+- No trailing whitespace in edited files.
+- Preserve existing code comments; do not remove or rewrite one that is still
+  relevant.
 - `go test ./internal/...` is fast and covers the poller, the reporter, workflow
   generation and the wire itself: `internal/pkg/client` stands a real `zip.App`
   up on a socket and exercises all five operations against it, so an encode that
@@ -121,3 +128,10 @@ send it, and the two protocols place that differently:
   every operation has the same shape, so `answer` does the work once.
 - Do not add a second way to reach the forge. `client.Client` is the interface;
   everything goes through it.
+
+### Conventions inherited from upstream act_runner
+
+- Never force-push, amend, or squash unless asked. Use new commits and normal
+  push for pull request updates.
+- Include authorship attribution in issue and pull request comments.
+- Add `Co-Authored-By` lines to all commits, indicating name and model used.

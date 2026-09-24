@@ -17,3 +17,8 @@ node_modules/
 coverage/
 __pycache__/
 .venv/
+
+# Local symlinks to LLM.md
+CLAUDE.md
+AGENTS.md
+GEMINI.md
