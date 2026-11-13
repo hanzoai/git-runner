@@ -68,18 +68,34 @@ func dial(address string, insecure bool, wait time.Duration) (*zip.Conn, error) 
 	}
 	secure := u.Scheme == "https"
 	zip.RegisterTransport(scheme, zip.Transport{Dial: func(addr string) zip.Client {
-		return &fasthttp.HostClient{
+		return schemed{&fasthttp.HostClient{
 			Addr:                   port(addr, secure),
 			IsTLS:                  secure,
 			TLSConfig:              verify(insecure),
 			DisablePathNormalizing: true,
 			ReadTimeout:            wait,
 			WriteTimeout:           wait,
-		}
+		}}
 	}})
 	// Host only: the op plane answers at the root of the forge, and a dialer
 	// cannot use a path.
 	return zip.Dial(scheme + "://" + u.Host)
+}
+
+// schemed states the request's scheme as the client's own. zip addresses a call by
+// host and path and leaves the URI's scheme at fasthttp's default, http, and a
+// HostClient with IsTLS refuses a request whose scheme says otherwise ("can't
+// follow redirects to a different protocol") before it dials: an https forge was
+// unreachable.
+type schemed struct{ *fasthttp.HostClient }
+
+func (c schemed) Do(req *fasthttp.Request, resp *fasthttp.Response) error {
+	if c.IsTLS {
+		req.URI().SetScheme("https")
+	} else {
+		req.URI().SetScheme("http")
+	}
+	return c.HostClient.Do(req, resp)
 }
 
 // port defaults the port a URL usually omits and a dialer never can.
