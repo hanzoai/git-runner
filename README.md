@@ -1,5 +1,7 @@
 # git-runner
 
+[![Open in Hanzo](https://hanzo.app/badges/open-in-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/git-runner&ref=main&action=open) [![Edit with Hanzo](https://hanzo.app/badges/edit-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/git-runner&ref=main&action=edit) [![Deploy with Hanzo](https://hanzo.app/badges/deploy-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/git-runner&ref=main&action=deploy)
+
 The Hanzo Git Actions runner — executes `.hanzo/workflows` jobs for
 git.hanzo.ai. Our fork of the upstream act-runner lineage: module
 `github.com/hanzoai/git-runner`, binary `git-runner`, env contract `GIT_*`
