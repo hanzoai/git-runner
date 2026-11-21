@@ -67,7 +67,12 @@ them carries an `/api` segment.
   a `zip.Call` cannot be cancelled once it is on the wire — a context deadline
   fails it before the first byte and never after — so the wait for an answer has
   to be a ceiling on the transport. That ceiling is `runner.fetch_timeout`, and
-  it now bounds every call, not only the one that asks for a job.
+  it now bounds every call, not only the one that asks for a job. A pod has no
+  config file, so `RUNNER_FETCH_TIMEOUT`, `RUNNER_FETCH_INTERVAL` and
+  `RUNNER_FETCH_INTERVAL_MAX` (Go durations) set the three from the environment.
+  A forge that answers `task` after the timeout has already assigned the task the
+  runner then never hears of: the task stays running with no log until the
+  forge's zombie sweep, which is how a loaded forge loses jobs.
 - **There is no long poll and there never was.** `task` answers immediately,
   always. `TaskIn.Queue` is the queue version this runner last saw; a forge
   whose version still matches has queued nothing and answers without opening the

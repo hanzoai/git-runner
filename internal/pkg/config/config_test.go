@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,4 +39,32 @@ cache:
 
 	_, err := LoadDefault(path)
 	require.NoError(t, err)
+}
+
+func TestLoadDefault_TheEnvironmentSetsHowTheForgeIsPolled(t *testing.T) {
+	t.Setenv("RUNNER_FETCH_TIMEOUT", "45s")
+	t.Setenv("RUNNER_FETCH_INTERVAL", "8s")
+	t.Setenv("RUNNER_FETCH_INTERVAL_MAX", "20s")
+
+	cfg, err := LoadDefault("")
+	require.NoError(t, err)
+	assert.Equal(t, 45*time.Second, cfg.Runner.FetchTimeout)
+	assert.Equal(t, 8*time.Second, cfg.Runner.FetchInterval)
+	assert.Equal(t, 20*time.Second, cfg.Runner.FetchIntervalMax)
+}
+
+func TestLoadDefault_WithNothingSetThePollingIsTheDefault(t *testing.T) {
+	cfg, err := LoadDefault("")
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Second, cfg.Runner.FetchTimeout)
+	assert.Equal(t, 2*time.Second, cfg.Runner.FetchInterval)
+}
+
+func TestLoadDefault_RefusesAnUnreadableFetchSetting(t *testing.T) {
+	for _, v := range []string{"soon", "0s", "-5s"} {
+		t.Setenv("RUNNER_FETCH_TIMEOUT", v)
+		_, err := LoadDefault("")
+		require.Error(t, err, v)
+		assert.Contains(t, err.Error(), "RUNNER_FETCH_TIMEOUT")
+	}
 }

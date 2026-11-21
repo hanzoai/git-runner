@@ -88,6 +88,33 @@ type Config struct {
 	Metrics   Metrics   `yaml:"metrics"`   // Metrics represents the configuration for the Prometheus metrics endpoint.
 }
 
+// fetchFromEnv lets the environment set how the runner polls the forge, which a pod has no
+// config file to say: RUNNER_FETCH_TIMEOUT, RUNNER_FETCH_INTERVAL and RUNNER_FETCH_INTERVAL_MAX,
+// each a Go duration. It overrides the file. A forge that answers a poll after the timeout has
+// already assigned the task the runner then never hears of, so the timeout is what a loaded
+// forge needs raised.
+func (r *Runner) fetchFromEnv() error {
+	for _, f := range []struct {
+		name string
+		to   *time.Duration
+	}{
+		{"RUNNER_FETCH_TIMEOUT", &r.FetchTimeout},
+		{"RUNNER_FETCH_INTERVAL", &r.FetchInterval},
+		{"RUNNER_FETCH_INTERVAL_MAX", &r.FetchIntervalMax},
+	} {
+		v := os.Getenv(f.name)
+		if v == "" {
+			continue
+		}
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("%s=%q is not a positive duration", f.name, v)
+		}
+		*f.to = d
+	}
+	return nil
+}
+
 // LoadDefault returns the default configuration.
 // If file is not empty, it will be used to load the configuration.
 func LoadDefault(file string) (*Config, error) {
@@ -100,6 +127,10 @@ func LoadDefault(file string) (*Config, error) {
 		if err := yaml.Unmarshal(content, cfg); err != nil {
 			return nil, fmt.Errorf("parse config file %q: %w", file, err)
 		}
+	}
+
+	if err := cfg.Runner.fetchFromEnv(); err != nil {
+		return nil, err
 	}
 
 	if cfg.Runner.EnvFile != "" {
